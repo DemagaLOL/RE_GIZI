@@ -1,18 +1,20 @@
 import type { Metadata } from "next"
+import Link from "next/link"
 import { Suspense } from "react"
 import { Container } from "@/components/shared/container"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
-import { AccountPicker, getSession, signOut } from "@/features/session"
+import { getSession, identityName, LoginPanel, ROLE_HOME, signOut } from "@/features/session"
 
 export const metadata: Metadata = {
   title: "Masuk",
-  description: "Pilih akun demo SPPG atau penerima untuk mencoba RE:GIZI.",
+  description: "Masuk ke RE:GIZI sebagai SPPG atau penerima sisa makanan.",
 }
 
 const REQUIRED_MESSAGE: Record<string, string> = {
-  sppg: "Halaman itu khusus SPPG. Silakan masuk sebagai SPPG.",
-  penerima: "Halaman itu khusus penerima. Silakan masuk sebagai penerima.",
+  sppg: "Halaman itu khusus SPPG. Silakan masuk dengan akun SPPG.",
+  penerima: "Halaman itu khusus penerima. Silakan masuk dengan akun penerima.",
+  tps: "Halaman itu khusus TPS. Silakan masuk dengan akun TPS.",
 }
 
 /** Info sesi saat ini beserta tombol keluar, atau pesan alasan diarahkan ke sini. */
@@ -30,35 +32,42 @@ async function CurrentSession({ searchParams }: { searchParams: PageProps<"/masu
           <p className="text-sm text-secondary-foreground">
             Masuk sebagai{" "}
             <span className="font-semibold">
-              {session.role === "sppg" ? session.sppg.name : session.recipient.name}
-            </span>
+              {identityName(session)}
+            </span>{" "}
+            <span className="text-muted-foreground">({session.email})</span>
           </p>
-          <form action={signOut}>
-            <Button type="submit" variant="outline">
-              Keluar
+          <div className="flex gap-2">
+            <Button asChild variant="outline">
+              <Link href={ROLE_HOME[session.role].href}>{ROLE_HOME[session.role].label}</Link>
             </Button>
-          </form>
+            <form action={signOut}>
+              <Button type="submit" variant="outline">
+                Keluar
+              </Button>
+            </form>
+          </div>
         </div>
       )}
     </>
   )
 }
 
-/** Rute `/masuk`: pemilihan akun demo. */
+/** Rute `/masuk`: masuk dengan email & kata sandi. */
 export default function Page({ searchParams }: PageProps<"/masuk">) {
   return (
     <Container className="flex flex-col gap-6 py-8 md:py-12">
       <section className="flex flex-col gap-2">
         <h1 className="text-3xl font-bold tracking-tight md:text-4xl">Masuk</h1>
         <p className="max-w-2xl text-muted-foreground">
-          Mode demo: pilih akun SPPG atau penerima untuk mencoba alur RE:GIZI tanpa kata sandi.
+          SPPG mengelola sisa makanan dari dasbor; penerima mengklaim sisa yang sesuai kebutuhannya.
+          Akun SPPG dibuat oleh pengelola RE:GIZI.
         </p>
       </section>
       <Suspense fallback={null}>
         <CurrentSession searchParams={searchParams} />
       </Suspense>
       <Suspense fallback={<Skeleton className="h-96 w-full rounded-xl" />}>
-        <AccountPicker />
+        <LoginPanel />
       </Suspense>
     </Container>
   )

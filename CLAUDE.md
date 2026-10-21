@@ -13,9 +13,15 @@
 | **A** | Layak konsumsi | UMKM, warga | porsi |
 | **B** | Pakan ternak | peternak | kg |
 | **C** | Kompos | petani, komposter | kg |
-| **D** | Tidak layak, dibuang | tidak ada (hanya dicatat, status `discarded`) | kg |
+| **D** | Tidak layak, dibuang | tidak ada — diangkut **TPS** (`discarded` → `collected`) | kg |
 
-Peran pengguna: `sppg` (penyedia), `umkm`, `peternak`, `petani`, `warga` (penerima). Penerima hanya boleh melihat/mengklaim kategori yang sesuai (`ELIGIBLE_RECIPIENTS` di `src/lib/data/constants.ts`) — jangan pernah menampilkan sisa B/C ke penerima kategori A, dan kategori D tidak bisa diklaim siapa pun.
+Peran akun (`AccountRole`): `sppg` (penyedia), `recipient` (penerima: `umkm`, `peternak`, `petani`, `warga`, `komposter`), dan `tps` (Tempat Pembuangan Sampah). Penerima hanya boleh melihat/mengklaim kategori yang sesuai (`ELIGIBLE_RECIPIENTS` di `src/lib/data/constants.ts`) — jangan pernah menampilkan sisa B/C ke penerima kategori A, dan kategori D tidak bisa diklaim siapa pun.
+
+**Pembuangan kategori D** (`src/lib/data/disposals.ts`, fitur `disposal`, rute `/pembuangan`): batch D (`discarded`, termasuk hasil degradasi) masuk antrean TPS; TPS menandai seluruh batch "Sudah Diangkut" → tercatat di `disposals`, batch menjadi `collected`. **Detail batch D hanya boleh dilihat TPS dan SPPG pemiliknya**; peran lain hanya melihat angka agregat (`getDisposalSummary` / `<DisposalSummary />`). Akun TPS hanya dari seed (`tps@demo.regizi.id`), tidak bisa daftar mandiri.
+
+**Degradasi kategori** (`src/lib/data/degradation.ts`): kategori hanya bisa turun. Turun otomatis saat lewat batas aman (kumulatif sejak `cookedAt`: A 4 jam → B 24 jam → C 72 jam → D), atau lebih awal secara manual oleh SPPG (`degradeBatch`). Saat turun, klaim `pending` dibatalkan dan jumlahnya kembali ke sisa, satuan porsi dikonversi ke kg (`KG_PER_PORTION`), dan riwayatnya dicatat di `batch_category_events`. Klaim menyimpan snapshot `category`/`unit`. Degradasi dijalankan *lazy* setiap kali data batch dibaca/ditulis.
+
+**Jam aplikasi** (`src/lib/data/clock.ts`): semua waktu domain sisa makanan memakai `simNow()`/`getNow()`, **jangan `Date.now()`**. Jam bisa disimulasikan untuk demo (dipercepat sampai 600×, dijeda, dimajukan) lewat `/waktu` (khusus SPPG). Statusnya disimpan di tabel `sim_clock`. Aktif di dev; di produksi hanya bila `SIM_CLOCK=1`. Sesi & login tetap memakai waktu nyata.
 
 ## 2. Stack
 
@@ -23,7 +29,8 @@ Peran pengguna: `sppg` (penyedia), `umkm`, `peternak`, `petani`, `warga` (peneri
 - **TypeScript** (`strict: true`), alias path `@/*` → `src/*`.
 - **Tailwind CSS v4** — konfigurasi lewat CSS (`@theme` di `src/app/globals.css`), tidak ada `tailwind.config.*`.
 - **shadcn/ui** (style `radix-nova`, berbasis Radix UI) + ikon **lucide-react**. Tambah komponen dengan `npx shadcn@latest add <nama>`.
-- Perintah: `npm run dev`, `npm run build`, `npm run lint`.
+- **SQLite lokal** (`better-sqlite3`) + **Drizzle ORM** — file `data/regizi.db` (di-*gitignore*, bisa diganti lewat env `DATABASE_PATH`). Skema di `src/lib/data/db/schema.ts`, migrasi di `drizzle/` (di-commit). Database kosong otomatis dimigrasi & diisi seed saat pertama diakses. Butuh disk persisten — tidak cocok untuk hosting serverless (Vercel).
+- Perintah: `npm run dev`, `npm run build`, `npm run lint`, `npm test` (tes unit data layer via `tsx --test`), `npm run db:generate` (buat migrasi setelah ubah skema), `npm run db:reset` (kosongkan DB & isi ulang akun demo; aman saat `dev` menyala), `npm run db:studio`.
 
 ## 3. Konvensi
 
@@ -47,6 +54,10 @@ src/
     utils.ts
 ```
 
+- `src/app` dibagi tiga **route group** (tidak memengaruhi URL), masing-masing dengan `layout.tsx` sendiri di bawah satu root layout:
+  - `(marketing)` — pengenalan (`/`, `/tentang`, `/kontak`): `Navbar` + `Footer`.
+  - `(auth)` — `/masuk`, `/daftar`: `SimpleHeader` saja.
+  - `(app)` — fungsi utama (`/dasbor`, `/klaim-saya`, `/sisa-makanan`): app shell `AppNav` (menu per peran + tab bar mobile; tamu melihat menu pengenalan Beranda/Tentang/Kontak + Masuk). Menu diatur di `APP_LINKS` (`src/features/session/components/app-nav.tsx`).
 - Satu fitur tidak boleh mengimpor isi internal fitur lain; gunakan `index.ts`-nya.
 - `src/components/ui` hanya berisi komponen presentasional generik. Logika bisnis masuk ke `src/features/*`.
 - Default ke Server Components; tambahkan `"use client"` hanya bila perlu interaktivitas.

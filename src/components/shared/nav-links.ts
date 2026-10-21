@@ -4,7 +4,6 @@ type NavLink = { href: string; label: string }
 /** Tautan navigasi utama, dipakai bersama oleh Navbar, menu mobile, dan Footer. */
 const NAV_LINKS: readonly NavLink[] = [
   { href: "/", label: "Beranda" },
-  { href: "/sisa-makanan", label: "Sisa Makanan" },
   { href: "/tentang", label: "Tentang" },
   { href: "/kontak", label: "Kontak" },
 ]

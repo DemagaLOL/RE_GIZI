@@ -48,7 +48,7 @@ function MobileNav() {
           onClick={() => setOpen(false)}
           className="mt-2 flex h-11 items-center rounded-lg px-3 text-base font-medium text-muted-foreground hover:bg-muted"
         >
-          Ganti akun
+          Akun
         </Link>
       </SheetContent>
     </Sheet>

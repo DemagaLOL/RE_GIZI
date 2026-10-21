@@ -1,6 +1,6 @@
 /**
  * Fitur klaim: penerima mengklaim sisa makanan dan mendapat kode ambil,
- * serta melihat riwayat klaimnya.
+ * melihat riwayat klaimnya, dan membatalkan klaim yang belum diambil.
  */
 
 export { ClaimPanel } from "./components/claim-panel"

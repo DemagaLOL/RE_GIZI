@@ -6,8 +6,16 @@ import { ArrowLeft } from "lucide-react"
 import { Container } from "@/components/shared/container"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ClaimPanel } from "@/features/claim"
-import { BatchDetail } from "@/features/listing"
-import { getBatchById, getNow } from "@/lib/data"
+import { DisposalLockedNotice } from "@/features/disposal"
+import { BatchDetail, CategoryLockedNotice } from "@/features/listing"
+import { getSession } from "@/features/session"
+import {
+  distanceKm,
+  ELIGIBLE_RECIPIENTS,
+  getBatchById,
+  getCategoryEvents,
+  getNow,
+} from "@/lib/data"
 
 export const metadata: Metadata = {
   title: "Detail Sisa Makanan",
@@ -16,13 +24,29 @@ export const metadata: Metadata = {
 /** Ambil batch lalu tampilkan detail dan panel klaim. */
 async function BatchContent({ params }: { params: PageProps<"/sisa-makanan/[id]">["params"] }) {
   const { id } = await params
-  const batch = await getBatchById(id)
-  if (!batch) notFound()
-  const now = await getNow()
+  const [found, session] = await Promise.all([getBatchById(id), getSession()])
+  if (!found) notFound()
+  // Isi sisa kategori D hanya untuk TPS dan SPPG pemiliknya; peran lain hanya melihat jumlah agregat.
+  const canViewDiscard =
+    session?.role === "tps" || (session?.role === "sppg" && session.sppg.id === found.sppgId)
+  if (found.category === "D" && !canViewDiscard) return <DisposalLockedNotice />
+  // Penerima hanya boleh melihat kategori yang sesuai jenisnya (mis. warga tidak melihat sisa pakan).
+  if (
+    session?.role === "recipient" &&
+    !ELIGIBLE_RECIPIENTS[found.category].includes(session.recipient.type)
+  ) {
+    return <CategoryLockedNotice recipientType={session.recipient.type} />
+  }
+
+  const [now, events] = await Promise.all([getNow(), getCategoryEvents(found.id)])
+  const batch =
+    session?.role === "recipient"
+      ? { ...found, distanceKm: distanceKm(session.recipient.location, found.sppg.location) }
+      : found
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_22rem] lg:items-start">
-      <BatchDetail batch={batch} now={now} />
+      <BatchDetail batch={batch} now={now} events={events} />
       <Suspense fallback={<Skeleton className="h-48 w-full rounded-xl" />}>
         <ClaimPanel batch={batch} />
       </Suspense>

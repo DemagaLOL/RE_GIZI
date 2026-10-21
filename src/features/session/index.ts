@@ -1,10 +1,20 @@
 /**
- * Fitur sesi demo: masuk sebagai SPPG atau penerima tanpa kata sandi (cookie),
- * untuk keperluan demo sebelum autentikasi sungguhan.
+ * Fitur sesi & autentikasi: masuk dengan email + kata sandi, pendaftaran mandiri
+ * penerima (opsional dengan lokasi GPS), keluar, pembaruan lokasi penerima, serta
+ * pembacaan sesi (cookie token acak, divalidasi ke data layer).
  */
 
-export { signInAs, signOut } from "./actions"
-export { AccountPicker } from "./components/account-picker"
+export { registerAction, signInAction, signOut } from "./actions"
+export { AppNav } from "./components/app-nav"
+export { LoginPanel } from "./components/login-panel"
+export { RegisterForm } from "./components/register-form"
 export { SessionNav } from "./components/session-nav"
-export { getSession, requireRecipientSession, requireSppgSession } from "./session"
-export type { Session } from "./types"
+export { UpdateLocationButton } from "./components/update-location-button"
+export { identityName, ROLE_HOME } from "./identity"
+export {
+  getSession,
+  requireRecipientSession,
+  requireSppgSession,
+  requireTpsSession,
+} from "./session"
+export type { AuthFormState, Session } from "./types"

@@ -2,9 +2,10 @@ import Link from "next/link"
 import { Clock, MapPin } from "lucide-react"
 import { FoodStatusBadge } from "@/components/shared/food-status-badge"
 import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { BATCH_STATUS_LABEL, type SurplusBatchWithSppg } from "@/lib/data"
-import { formatQuantity, formatTimeLeft, isNearDeadline } from "@/lib/format"
+import { formatDistance, formatQuantity, formatTimeLeft, isNearDeadline } from "@/lib/format"
+import { cn } from "@/lib/utils"
 
 /**
  * Kartu ringkas satu batch sisa makanan; seluruh kartu menaut ke halaman detail.
@@ -18,7 +19,18 @@ export function BatchCard({ batch, now }: { batch: SurplusBatchWithSppg; now: nu
       <CardHeader>
         <div className="flex flex-wrap items-center gap-2">
           <FoodStatusBadge category={batch.category} />
-          {batch.status !== "available" && (
+          {batch.status === "available" ? (
+            // Batas aman tampil sejajar kategori agar keduanya paling menonjol (arah desain proposal).
+            <span
+              className={cn(
+                "flex items-center gap-1 rounded-full px-2 py-0.5 text-sm font-semibold",
+                near ? "bg-warning text-warning-foreground" : "bg-secondary text-secondary-foreground"
+              )}
+            >
+              <Clock className="size-3.5" aria-hidden />
+              Aman {formatTimeLeft(batch.safeUntil, now)}
+            </span>
+          ) : (
             <Badge variant="outline">{BATCH_STATUS_LABEL[batch.status]}</Badge>
           )}
         </div>
@@ -30,6 +42,9 @@ export function BatchCard({ batch, now }: { batch: SurplusBatchWithSppg; now: nu
         <CardDescription className="flex items-center gap-1">
           <MapPin className="size-3.5 shrink-0" aria-hidden />
           {batch.sppg.name} · {batch.sppg.district}
+          {batch.distanceKm !== undefined && (
+            <span className="font-medium text-foreground"> · ± {formatDistance(batch.distanceKm)}</span>
+          )}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -40,20 +55,6 @@ export function BatchCard({ batch, now }: { batch: SurplusBatchWithSppg; now: nu
           tersisa dari {formatQuantity(batch.quantity, batch.unit)}
         </p>
       </CardContent>
-      {batch.status === "available" && (
-        <CardFooter>
-          <span
-            className={
-              near
-                ? "flex items-center gap-1 rounded-full bg-warning px-2 py-0.5 text-sm font-medium text-warning-foreground"
-                : "flex items-center gap-1 text-sm text-muted-foreground"
-            }
-          >
-            <Clock className="size-3.5" aria-hidden />
-            Aman {formatTimeLeft(batch.safeUntil, now)}
-          </span>
-        </CardFooter>
-      )}
     </Card>
   )
 }

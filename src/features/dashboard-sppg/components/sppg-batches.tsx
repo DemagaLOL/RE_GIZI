@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { PackageOpen } from "lucide-react"
+import { CategoryHistory } from "@/components/shared/category-history"
 import { EmptyState } from "@/components/shared/empty-state"
 import { FoodStatusBadge } from "@/components/shared/food-status-badge"
 import { Badge } from "@/components/ui/badge"
@@ -8,17 +9,27 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import {
   BATCH_STATUS_LABEL,
   CLAIM_STATUS_LABEL,
+  NEXT_CATEGORY,
   getBatches,
-  getNow,
+  getCategoryEvents,
   getClaimsByBatch,
+  getNow,
   getRecipients,
+  type BatchStatus,
 } from "@/lib/data"
 import { formatDateTime, formatQuantity, formatTimeLeft } from "@/lib/format"
+import { DegradeBatchForm } from "./degrade-batch-form"
+
+/** Status batch yang masih bisa turun kategori (otomatis maupun manual). */
+const DEGRADABLE: readonly BatchStatus[] = ["available", "reserved"]
 
 /** Daftar batch milik satu SPPG beserta klaim tiap batch. Render dalam `<Suspense>`. */
 export async function SppgBatches({ sppgId }: { sppgId: string }) {
   const [batches, recipients] = await Promise.all([getBatches({ sppgId }), getRecipients()])
-  const claimsPerBatch = await Promise.all(batches.map((b) => getClaimsByBatch(b.id)))
+  const [claimsPerBatch, eventsPerBatch] = await Promise.all([
+    Promise.all(batches.map((b) => getClaimsByBatch(b.id))),
+    Promise.all(batches.map((b) => getCategoryEvents(b.id))),
+  ])
   const recipientName = new Map(recipients.map((r) => [r.id, r.name]))
   const now = await getNow()
 
@@ -41,6 +52,10 @@ export async function SppgBatches({ sppgId }: { sppgId: string }) {
     <div className="grid gap-4 lg:grid-cols-2">
       {batches.map((batch, i) => {
         const claims = claimsPerBatch[i].filter((c) => c.status !== "cancelled")
+        const pendingClaims = claims.filter((c) => c.status === "pending").length
+        const next = NEXT_CATEGORY[batch.category]
+        const degradable = DEGRADABLE.includes(batch.status) && next !== null
+        const events = eventsPerBatch[i]
         return (
           <Card key={batch.id}>
             <CardHeader>
@@ -56,11 +71,12 @@ export async function SppgBatches({ sppgId }: { sppgId: string }) {
               <CardDescription>
                 {formatQuantity(batch.remainingQuantity, batch.unit)} tersisa dari{" "}
                 {formatQuantity(batch.quantity, batch.unit)}
-                {batch.status === "available" && ` · aman ${formatTimeLeft(batch.safeUntil, now)}`}
+                {degradable && ` · turun ke ${next} ${formatTimeLeft(batch.safeUntil, now)}`}
               </CardDescription>
             </CardHeader>
-            {claims.length > 0 && (
-              <CardContent>
+            {(claims.length > 0 || events.length > 0 || degradable) && (
+            <CardContent className="flex flex-col gap-4">
+              {claims.length > 0 && (
                 <ul className="flex flex-col divide-y rounded-lg border">
                   {claims.map((claim) => (
                     <li key={claim.id} className="flex flex-wrap items-center justify-between gap-2 p-3 text-sm">
@@ -69,19 +85,27 @@ export async function SppgBatches({ sppgId }: { sppgId: string }) {
                           {recipientName.get(claim.recipientId) ?? "Penerima"}
                         </span>
                         <span className="text-muted-foreground">
-                          {formatQuantity(claim.quantity, batch.unit)} · {formatDateTime(claim.claimedAt)}
+                          {formatQuantity(claim.quantity, claim.unit)} · {formatDateTime(claim.claimedAt)}
                         </span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono font-semibold tracking-wider">{claim.pickupCode}</span>
-                        <Badge variant={claim.status === "pending" ? "warning" : "secondary"}>
-                          {CLAIM_STATUS_LABEL[claim.status]}
-                        </Badge>
-                      </div>
+                      {/* Kode ambil sengaja tidak ditampilkan: petugas harus menerimanya dari penerima. */}
+                      <Badge variant={claim.status === "pending" ? "warning" : "secondary"}>
+                        {CLAIM_STATUS_LABEL[claim.status]}
+                      </Badge>
                     </li>
                   ))}
                 </ul>
-              </CardContent>
+              )}
+              <CategoryHistory events={events} />
+              {degradable && (
+                <DegradeBatchForm
+                  key={batch.category}
+                  batchId={batch.id}
+                  category={batch.category}
+                  pendingClaims={pendingClaims}
+                />
+              )}
+            </CardContent>
             )}
           </Card>
         )

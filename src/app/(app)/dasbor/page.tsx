@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ImpactSummary, PickupConfirmForm, SppgBatches } from "@/features/dashboard-sppg"
+import { DisposalSummary } from "@/features/disposal"
 import { requireSppgSession } from "@/features/session"
 
 export const metadata: Metadata = {
@@ -43,6 +44,9 @@ async function Dashboard({ searchParams }: { searchParams: PageProps<"/dasbor">[
 
       <Suspense fallback={<Skeleton className="h-24 w-full rounded-xl" />}>
         <ImpactSummary sppgId={sppg.id} />
+      </Suspense>
+      <Suspense fallback={null}>
+        <DisposalSummary sppgId={sppg.id} />
       </Suspense>
 
       <Card>

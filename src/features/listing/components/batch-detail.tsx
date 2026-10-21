@@ -1,13 +1,26 @@
-import { CalendarClock, ChefHat, MapPin, StickyNote, Users } from "lucide-react"
+import {
+  ArrowDownCircle,
+  CalendarClock,
+  ChefHat,
+  MapPin,
+  Navigation,
+  StickyNote,
+  Users,
+} from "lucide-react"
+import { CategoryHistory } from "@/components/shared/category-history"
 import { FoodStatusBadge } from "@/components/shared/food-status-badge"
 import { Badge } from "@/components/ui/badge"
 import {
   BATCH_STATUS_LABEL,
+  CATEGORY_LABEL,
+  directionsUrl,
   ELIGIBLE_RECIPIENTS,
+  NEXT_CATEGORY,
   RECIPIENT_TYPE_LABEL,
+  type CategoryEvent,
   type SurplusBatchWithSppg,
 } from "@/lib/data"
-import { formatDateTime, formatQuantity, formatTimeLeft } from "@/lib/format"
+import { formatDateTime, formatDistance, formatQuantity, formatTimeLeft } from "@/lib/format"
 
 /** Satu baris info dengan ikon. */
 function InfoRow({ icon: Icon, label, children }: { icon: typeof MapPin; label: string; children: React.ReactNode }) {
@@ -23,11 +36,23 @@ function InfoRow({ icon: Icon, label, children }: { icon: typeof MapPin; label: 
 }
 
 /**
- * Informasi lengkap satu batch: menu, kuantitas, batas aman, SPPG asal, dan penerima yang berhak.
+ * Informasi lengkap satu batch: menu, kuantitas, batas aman, kategori berikutnya,
+ * SPPG asal, penerima yang berhak, dan riwayat turun kategori.
  * @param now Epoch ms saat render.
+ * @param events Riwayat turun kategori (`getCategoryEvents`).
  */
-export function BatchDetail({ batch, now }: { batch: SurplusBatchWithSppg; now: number }) {
+export function BatchDetail({
+  batch,
+  now,
+  events = [],
+}: {
+  batch: SurplusBatchWithSppg
+  now: number
+  events?: readonly CategoryEvent[]
+}) {
   const eligible = ELIGIBLE_RECIPIENTS[batch.category]
+  const next = NEXT_CATEGORY[batch.category]
+  const degrading = next !== null && (batch.status === "available" || batch.status === "reserved")
 
   return (
     <div className="flex flex-col gap-6">
@@ -51,6 +76,20 @@ export function BatchDetail({ batch, now }: { batch: SurplusBatchWithSppg; now: 
         </InfoRow>
         <InfoRow icon={MapPin} label="Alamat pengambilan">
           {batch.sppg.address}, {batch.sppg.district}, {batch.sppg.regency}
+          {batch.distanceKm !== undefined && (
+            <span className="block text-sm font-normal text-muted-foreground">
+              ± {formatDistance(batch.distanceKm)} dari lokasi Anda (garis lurus)
+            </span>
+          )}
+          <a
+            href={directionsUrl(batch.sppg.location)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-1 inline-flex min-h-11 items-center gap-1 text-sm font-medium text-primary hover:underline"
+          >
+            <Navigation className="size-4" aria-hidden />
+            Petunjuk Arah
+          </a>
         </InfoRow>
         <InfoRow icon={CalendarClock} label="Selesai dimasak">
           {formatDateTime(batch.cookedAt)}
@@ -58,6 +97,11 @@ export function BatchDetail({ batch, now }: { batch: SurplusBatchWithSppg; now: 
         {batch.category !== "D" && (
           <InfoRow icon={CalendarClock} label="Batas aman">
             {formatDateTime(batch.safeUntil)} ({formatTimeLeft(batch.safeUntil, now)})
+          </InfoRow>
+        )}
+        {degrading && (
+          <InfoRow icon={ArrowDownCircle} label="Setelah batas aman">
+            Turun ke {next} · {CATEGORY_LABEL[next]}
           </InfoRow>
         )}
         <InfoRow icon={Users} label="Dapat diklaim oleh">
@@ -71,6 +115,8 @@ export function BatchDetail({ batch, now }: { batch: SurplusBatchWithSppg; now: 
           </InfoRow>
         )}
       </div>
+
+      <CategoryHistory events={events} />
     </div>
   )
 }

@@ -1,36 +1,33 @@
 import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
-import { getRecipientById, getSppgById } from "@/lib/data"
+import { getIdentityBySessionToken } from "@/lib/data"
 import type { Session } from "./types"
 
-/** Nama cookie sesi demo. Isinya `sppg:<id>` atau `recipient:<id>`. */
+/** Nama cookie sesi. Isinya token acak; server hanya menyimpan hash-nya. */
 export const SESSION_COOKIE = "regizi_session"
 
 /**
- * Baca sesi demo dari cookie dan validasi ke data layer. Membaca cookie berarti
+ * Baca sesi dari cookie dan validasi ke data layer. Membaca cookie berarti
  * pemanggil harus dirender di dalam `<Suspense>`.
- * @returns Sesi aktif, atau `null` bila belum masuk / cookie tidak valid.
+ * @returns Sesi aktif, atau `null` bila belum masuk / token tidak valid / kedaluwarsa.
  */
 export async function getSession(): Promise<Session> {
-  const value = (await cookies()).get(SESSION_COOKIE)?.value
-  if (!value) return null
-
-  const [role, id] = value.split(":")
-  if (role === "sppg" && id) {
-    const sppg = await getSppgById(id)
-    return sppg ? { role: "sppg", sppg } : null
-  }
-  if (role === "recipient" && id) {
-    const recipient = await getRecipientById(id)
-    return recipient ? { role: "recipient", recipient } : null
-  }
-  return null
+  const token = (await cookies()).get(SESSION_COOKIE)?.value
+  if (!token) return null
+  return getIdentityBySessionToken(token)
 }
 
 /** Sesi SPPG wajib; selain itu diarahkan ke halaman masuk. */
 export async function requireSppgSession(): Promise<Extract<Session, { role: "sppg" }>> {
   const session = await getSession()
   if (session?.role !== "sppg") redirect("/masuk?perlu=sppg")
+  return session
+}
+
+/** Sesi TPS wajib; selain itu diarahkan ke halaman masuk. */
+export async function requireTpsSession(): Promise<Extract<Session, { role: "tps" }>> {
+  const session = await getSession()
+  if (session?.role !== "tps") redirect("/masuk?perlu=tps")
   return session
 }
 

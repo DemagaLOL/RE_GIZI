@@ -2,9 +2,18 @@
 
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
-import { confirmPickup, createBatch, type SurplusCategory } from "@/lib/data"
+import {
+  CATEGORY_LABEL,
+  confirmPickup,
+  createBatch,
+  degradeBatch,
+  getNow,
+  getPickupPreview,
+  type SurplusCategory,
+} from "@/lib/data"
 import { getSession } from "@/features/session"
-import type { DashboardFormState } from "./types"
+import { formatPickupCode } from "@/lib/format"
+import type { DashboardFormState, PickupFormState } from "./types"
 
 const CATEGORIES: readonly SurplusCategory[] = ["A", "B", "C", "D"]
 /** Pilihan "selesai dimasak" di form (menit lalu). */
@@ -24,11 +33,18 @@ function revalidateListings(): void {
   revalidatePath("/")
 }
 
-/** Server Action konfirmasi pengambilan berdasarkan kode ambil. */
-export async function confirmPickupAction(
-  _prev: DashboardFormState,
+/**
+ * Server Action konfirmasi pengambilan dua langkah, dipilih lewat field `intent`:
+ * `check` menampilkan detail klaim untuk kode ambil, `confirm` menandai klaim
+ * sudah diambil (kode divalidasi ulang), `reset` kembali ke input kode.
+ */
+export async function pickupAction(
+  _prev: PickupFormState,
   formData: FormData
-): Promise<DashboardFormState> {
+): Promise<PickupFormState> {
+  const intent = formData.get("intent")
+  if (intent === "reset") return { status: "idle" }
+
   const sppgId = await currentSppgId()
   if (!sppgId) return { status: "error", message: "Masuk sebagai SPPG terlebih dahulu." }
 
@@ -37,11 +53,19 @@ export async function confirmPickupAction(
     return { status: "error", message: "Masukkan kode ambil." }
   }
 
-  const result = await confirmPickup({ sppgId, pickupCode })
-  if (!result.ok) return { status: "error", message: result.error }
+  if (intent === "confirm") {
+    const result = await confirmPickup({ sppgId, pickupCode })
+    if (!result.ok) return { status: "error", message: result.error }
+    revalidateListings()
+    return {
+      status: "success",
+      message: `Kode ${formatPickupCode(result.data.pickupCode)} dikonfirmasi sudah diambil.`,
+    }
+  }
 
-  revalidateListings()
-  return { status: "success", message: `Kode ${result.data.pickupCode} dikonfirmasi sudah diambil.` }
+  const preview = await getPickupPreview({ sppgId, pickupCode })
+  if (!preview.ok) return { status: "error", message: preview.error }
+  return { status: "preview", preview: preview.data }
 }
 
 /** Server Action pendaftaran sisa makanan baru; berhasil → kembali ke dasbor. */
@@ -65,11 +89,44 @@ export async function createBatchAction(
     category,
     menu: typeof menu === "string" ? menu : "",
     quantity: Number(formData.get("quantity")),
-    cookedAt: new Date(Date.now() - minutesAgo * 60_000).toISOString(),
+    // Jam aplikasi (bisa disimulasikan), bukan jam server, agar konsisten dengan batas aman.
+    cookedAt: new Date((await getNow()) - minutesAgo * 60_000).toISOString(),
     notes: typeof notes === "string" ? notes : undefined,
   })
   if (!result.ok) return { status: "error", message: result.error }
 
   revalidateListings()
   redirect("/dasbor?baru=1")
+}
+
+/**
+ * Server Action SPPG menurunkan kategori batch lebih awal (mis. makanan mulai basi).
+ * Klaim yang menunggu diambil dibatalkan oleh data layer.
+ */
+export async function degradeBatchAction(
+  _prev: DashboardFormState,
+  formData: FormData
+): Promise<DashboardFormState> {
+  const sppgId = await currentSppgId()
+  if (!sppgId) return { status: "error", message: "Masuk sebagai SPPG terlebih dahulu." }
+
+  const batchId = formData.get("batchId")
+  const toCategory = CATEGORIES.find((c) => c === formData.get("toCategory"))
+  if (typeof batchId !== "string" || !batchId) return { status: "error", message: "Batch tidak valid." }
+  if (!toCategory) return { status: "error", message: "Pilih kategori tujuan." }
+  const note = formData.get("note")
+
+  const result = await degradeBatch({
+    sppgId,
+    batchId,
+    toCategory,
+    note: typeof note === "string" ? note : undefined,
+  })
+  if (!result.ok) return { status: "error", message: result.error }
+
+  revalidateListings()
+  return {
+    status: "success",
+    message: `Kategori diturunkan ke ${toCategory} (${CATEGORY_LABEL[toCategory]}).`,
+  }
 }

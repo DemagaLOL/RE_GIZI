@@ -26,32 +26,17 @@ export function ContactPage() {
       <section className="grid gap-4 sm:grid-cols-2">
         {channels.map((channel, i) => {
           const Icon = CHANNEL_ICONS[channel.type]
-          const body = (
-            <CardContent className="flex items-start gap-4">
-              <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-secondary text-primary">
-                <Icon className="size-5" />
-              </span>
-              <div className="min-w-0">
-                <p className="text-sm text-muted-foreground">{channel.label}</p>
-                <p className="break-words font-semibold">{channel.value}</p>
-              </div>
-            </CardContent>
-          )
           return (
-            <Card key={i} className={channel.href ? "transition-colors hover:bg-secondary/50" : undefined}>
-              {channel.href ? (
-                <a
-                  href={channel.href}
-                  className="block rounded-xl"
-                  {...(channel.href.startsWith("http")
-                    ? { target: "_blank", rel: "noopener noreferrer" }
-                    : {})}
-                >
-                  {body}
-                </a>
-              ) : (
-                body
-              )}
+            <Card key={i}>
+              <CardContent className="flex items-start gap-4">
+                <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-secondary text-primary">
+                  <Icon className="size-5" />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-sm text-muted-foreground">{channel.label}</p>
+                  <p className="break-words font-semibold">{channel.value}</p>
+                </div>
+              </CardContent>
             </Card>
           )
         })}

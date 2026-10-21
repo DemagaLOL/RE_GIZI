@@ -7,11 +7,12 @@ import {
   getBatches,
   getNow,
   RECIPIENT_TYPE_LABEL,
+  type GeoPoint,
   type RecipientType,
   type SurplusCategory,
 } from "@/lib/data"
 import { BatchCard } from "./batch-card"
-import { ListingFilters, parseRegency } from "./listing-filters"
+import { ListingFilters, parseRegency, parseSort } from "./listing-filters"
 
 /** Kategori yang bisa diklaim (D tidak pernah tampil di daftar). */
 const CLAIMABLE: readonly SurplusCategory[] = ["A", "B", "C"]
@@ -26,21 +27,25 @@ function visibleCategories(recipientType?: RecipientType): readonly SurplusCateg
  * Daftar batch tersedia beserta filter. Membaca `searchParams` dan data waktu-nyata,
  * jadi render di dalam `<Suspense>`.
  * @param recipientType Jenis penerima yang sedang masuk; membatasi kategori yang tampil.
+ * @param near Lokasi penerima; bila ada, kartu menampilkan jarak dan bisa diurutkan terdekat.
  */
 export async function BatchBrowser({
   searchParams,
   recipientType,
+  near,
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>
   recipientType?: RecipientType
+  near?: GeoPoint
 }) {
   const params = await searchParams
   const categories = visibleCategories(recipientType)
   const category = categories.find((c) => c === params.kategori)
   const regency = parseRegency(params.kabupaten)
+  const sort = near ? parseSort(params.urut) : "deadline"
 
   const batches = (
-    await getBatches({ status: "available", category, regency, recipientType })
+    await getBatches({ status: "available", category, regency, recipientType, near, sort })
   ).filter((b) => categories.includes(b.category))
   const now = await getNow()
 
@@ -52,7 +57,13 @@ export async function BatchBrowser({
           <span className="font-medium text-foreground">{RECIPIENT_TYPE_LABEL[recipientType]}</span>.
         </p>
       )}
-      <ListingFilters categories={categories} category={category} regency={regency} />
+      <ListingFilters
+        categories={categories}
+        category={category}
+        regency={regency}
+        sort={sort}
+        canSortByDistance={near !== undefined}
+      />
       {batches.length === 0 ? (
         <EmptyState
           icon={SearchX}

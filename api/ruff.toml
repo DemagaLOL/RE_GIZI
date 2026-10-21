@@ -1,0 +1,16 @@
+target-version = "py312"
+line-length = 100
+
+[lint]
+select = ["E", "F", "I", "DTZ", "TID251"]
+
+[lint.flake8-tidy-imports.banned-api]
+# Jam sistem hanya boleh dibaca di core/clock.py; selain itu pakai ClockLike.now().
+"datetime.datetime.now".msg = "Pakai ClockLike.now() (core.deps.get_clock), bukan jam sistem."
+"datetime.datetime.utcnow".msg = "Pakai ClockLike.now() (core.deps.get_clock), bukan jam sistem."
+"datetime.datetime.today".msg = "Pakai ClockLike.now() (core.deps.get_clock), bukan jam sistem."
+"datetime.date.today".msg = "Pakai ClockLike.now().date(), bukan jam sistem."
+"time.time".msg = "Pakai ClockLike.now() untuk waktu domain, atau time.monotonic untuk durasi."
+
+[lint.per-file-ignores]
+"core/clock.py" = ["DTZ", "TID251"]

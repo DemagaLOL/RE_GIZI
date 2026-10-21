@@ -5,6 +5,7 @@ import Link from "next/link"
 import { CheckCircle2, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { QuantityUnit } from "@/lib/data/types"
+import { formatPickupCode } from "@/lib/format"
 import { claimBatchAction } from "../actions"
 import type { ClaimFormState } from "../types"
 
@@ -32,7 +33,9 @@ export function ClaimForm({
         <p className="text-secondary-foreground">
           Klaim {state.quantity} {unit} berhasil. Tunjukkan kode ini ke petugas SPPG:
         </p>
-        <p className="font-mono text-4xl font-bold tracking-widest">{state.pickupCode}</p>
+        <p className="font-mono text-4xl font-bold tracking-widest">
+          {formatPickupCode(state.pickupCode)}
+        </p>
         <Button asChild variant="outline" className="mt-2">
           <Link href="/klaim-saya">Lihat Klaim Saya</Link>
         </Button>

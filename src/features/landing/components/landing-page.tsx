@@ -53,7 +53,7 @@ export function LandingPage() {
           <div className="flex flex-col gap-3 sm:flex-row">
             <Button asChild size="lg">
               <Link href="/sisa-makanan">
-                Cari Sisa Makanan
+                Telusuri Makanan
                 <ArrowRight data-icon="inline-end" aria-hidden />
               </Link>
             </Button>

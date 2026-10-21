@@ -25,7 +25,9 @@ export async function ClaimPanel({ batch }: { batch: SurplusBatchWithSppg }) {
 
   let content: React.ReactNode
   if (batch.status === "discarded") {
-    content = <Notice>Sisa kategori D tidak layak dimanfaatkan dan akan dibuang.</Notice>
+    content = <Notice>Sisa kategori D tidak layak dimanfaatkan dan menunggu diangkut TPS.</Notice>
+  } else if (batch.status === "collected") {
+    content = <Notice>Sisa kategori D ini sudah diangkut TPS.</Notice>
   } else if (batch.status === "expired") {
     content = <Notice>Batch ini sudah melewati batas aman dan tidak bisa diklaim.</Notice>
   } else if (batch.status !== "available") {
@@ -44,6 +46,8 @@ export async function ClaimPanel({ batch }: { batch: SurplusBatchWithSppg }) {
     )
   } else if (session.role === "sppg") {
     content = <Notice>Anda masuk sebagai SPPG. Klaim hanya bisa dilakukan oleh penerima.</Notice>
+  } else if (session.role === "tps") {
+    content = <Notice>Anda masuk sebagai TPS. TPS hanya mengangkut sisa kategori D.</Notice>
   } else if (!eligible.includes(session.recipient.type)) {
     content = (
       <Notice>

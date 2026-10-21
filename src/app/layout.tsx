@@ -1,10 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { Geist_Mono, Plus_Jakarta_Sans } from "next/font/google";
-import { Footer } from "@/components/shared/footer";
-import { Navbar } from "@/components/shared/navbar";
-import { Skeleton } from "@/components/ui/skeleton";
-import { SessionNav } from "@/features/session";
-import { Suspense } from "react";
 import "./globals.css";
 
 const jakarta = Plus_Jakarta_Sans({
@@ -33,24 +28,17 @@ export const viewport: Viewport = {
   ],
 };
 
-/** Layout global: Navbar menempel di atas, konten utama, Footer di bawah. */
+/**
+ * Layout akar: html, body, dan font saja. Kerangka halaman diatur per grup rute —
+ * `(marketing)` pengenalan, `(auth)` masuk/daftar, `(app)` fungsi utama.
+ */
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="id"
       className={`${jakarta.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="flex min-h-full flex-col">
-        <Navbar
-          sessionSlot={
-            <Suspense fallback={<Skeleton className="h-10 w-24 rounded-lg" />}>
-              <SessionNav />
-            </Suspense>
-          }
-        />
-        <main className="flex flex-1 flex-col">{children}</main>
-        <Footer />
-      </body>
+      <body className="flex min-h-full flex-col">{children}</body>
     </html>
   );
 }

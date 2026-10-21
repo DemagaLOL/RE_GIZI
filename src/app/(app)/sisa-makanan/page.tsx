@@ -1,19 +1,31 @@
 import type { Metadata } from "next"
 import { Suspense } from "react"
 import { Container } from "@/components/shared/container"
+import { DisposalSummary } from "@/features/disposal"
 import { BatchBrowser, BatchGridSkeleton } from "@/features/listing"
-import { getSession } from "@/features/session"
+import { getSession, UpdateLocationButton } from "@/features/session"
 
 export const metadata: Metadata = {
   title: "Sisa Makanan",
   description: "Temukan sisa makanan dari SPPG di sekitar Anda yang siap diambil.",
 }
 
-/** Baca sesi lalu tampilkan daftar sesuai jenis penerima. */
+/** Baca sesi lalu tampilkan daftar sesuai jenis & lokasi penerima. */
 async function Listing({ searchParams }: { searchParams: PageProps<"/sisa-makanan">["searchParams"] }) {
   const session = await getSession()
-  const recipientType = session?.role === "recipient" ? session.recipient.type : undefined
-  return <BatchBrowser searchParams={searchParams} recipientType={recipientType} />
+  if (session?.role !== "recipient") return <BatchBrowser searchParams={searchParams} />
+
+  const { recipient } = session
+  return (
+    <>
+      <UpdateLocationButton />
+      <BatchBrowser
+        searchParams={searchParams}
+        recipientType={recipient.type}
+        near={recipient.location}
+      />
+    </>
+  )
 }
 
 /** Rute `/sisa-makanan`: daftar sisa makanan tersedia. */
@@ -27,6 +39,9 @@ export default function Page({ searchParams }: PageProps<"/sisa-makanan">) {
           tunjukkan kode ambil ke petugas.
         </p>
       </section>
+      <Suspense fallback={null}>
+        <DisposalSummary />
+      </Suspense>
       <Suspense fallback={<BatchGridSkeleton />}>
         <Listing searchParams={searchParams} />
       </Suspense>
