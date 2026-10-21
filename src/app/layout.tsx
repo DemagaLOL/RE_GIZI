@@ -21,11 +21,9 @@ export const metadata: Metadata = {
     "Platform yang menghubungkan SPPG dengan UMKM, peternak, petani, dan warga untuk menyalurkan sisa makanan program MBG.",
 };
 
+// Hanya mode terang: token `.dark` belum diaktifkan, jadi bilah browser ikut terang (krem).
 export const viewport: Viewport = {
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#fbf8f1" },
-    { media: "(prefers-color-scheme: dark)", color: "#13211a" },
-  ],
+  themeColor: "#fbf8f1",
 };
 
 /**

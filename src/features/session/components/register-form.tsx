@@ -6,6 +6,7 @@ import { Loader2 } from "lucide-react"
 import { LocateButton } from "@/components/shared/locate-button"
 import { Button } from "@/components/ui/button"
 import {
+  DISTRICT_MAX_LENGTH,
   PASSWORD_MIN_LENGTH,
   RECIPIENT_TYPE_LABEL,
   RECIPIENT_TYPES,
@@ -88,7 +89,7 @@ export function RegisterForm() {
             id="district"
             name="district"
             required
-            maxLength={60}
+            maxLength={DISTRICT_MAX_LENGTH}
             defaultValue={values?.district}
             placeholder="mis. Kalimanah"
             className={FIELD_CLASS}

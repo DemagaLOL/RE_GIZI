@@ -60,75 +60,83 @@ export async function MyClaims({ recipientId }: { recipientId: string }) {
 
   return (
     <div className="grid gap-4 md:grid-cols-2">
-      {claims.map((claim) => (
-        <Card key={claim.id}>
-          <CardHeader>
-            <div className="flex flex-wrap items-center gap-2">
-              <FoodStatusBadge category={claim.category} />
-              <Badge variant={STATUS_VARIANT[claim.status]}>{CLAIM_STATUS_LABEL[claim.status]}</Badge>
-            </div>
-            <CardTitle className="leading-snug">
-              <Link href={`/sisa-makanan/${claim.batchId}`} className="hover:underline">
-                {claim.batch.menu}
-              </Link>
-            </CardTitle>
-            <CardDescription className="flex items-start gap-1">
-              <MapPin className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-              {claim.batch.sppg.name} — {claim.batch.sppg.address}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <p className="font-mono text-xl font-bold">
-                {formatQuantity(claim.quantity, claim.unit)}
-              </p>
-              <p className="text-sm text-muted-foreground">Diklaim {formatDateTime(claim.claimedAt)}</p>
-              {claim.status === "pending" && (
-                // Klaim batal otomatis bila batch turun kategori, jadi tenggat ambil = batas aman batch.
-                <p
-                  className={cn(
-                    "mt-1 flex w-fit items-center gap-1 text-sm font-medium",
-                    isNearDeadline(claim.batch.safeUntil, now) &&
-                      "rounded-full bg-warning px-2 py-0.5 text-warning-foreground"
-                  )}
-                >
-                  <Clock className="size-3.5 shrink-0" aria-hidden />
-                  Ambil sebelum {formatDateTime(claim.batch.safeUntil)} (
-                  {formatTimeLeft(claim.batch.safeUntil, now)})
-                </p>
-              )}
-              {claim.cancelReason === "degraded" && (
-                <p className="mt-1 text-sm text-destructive">
-                  Dibatalkan karena kondisi makanan turun ke kategori {claim.batch.category} (
-                  {CATEGORY_LABEL[claim.batch.category]}) sebelum diambil.
-                </p>
-              )}
-              {claim.cancelReason === "recipient" && (
-                <p className="mt-1 text-sm text-muted-foreground">Dibatalkan oleh Anda.</p>
-              )}
-            </div>
-            {claim.status === "pending" && (
-              <div className="rounded-lg bg-secondary px-3 py-2 text-center">
-                <p className="text-xs text-secondary-foreground">Kode ambil</p>
-                <p className="font-mono text-xl font-bold tracking-widest">
-                  {formatPickupCode(claim.pickupCode)}
-                </p>
+      {claims.map((claim) => {
+        // Detail batch kategori D hanya untuk TPS & SPPG pemiliknya: tanpa tautan detail dan alamat.
+        const discarded = claim.batch.category === "D"
+        return (
+          <Card key={claim.id}>
+            <CardHeader>
+              <div className="flex flex-wrap items-center gap-2">
+                <FoodStatusBadge category={claim.category} />
+                <Badge variant={STATUS_VARIANT[claim.status]}>{CLAIM_STATUS_LABEL[claim.status]}</Badge>
               </div>
+              <CardTitle className="leading-snug">
+                {discarded ? (
+                  claim.batch.menu
+                ) : (
+                  <Link href={`/sisa-makanan/${claim.batchId}`} className="hover:underline">
+                    {claim.batch.menu}
+                  </Link>
+                )}
+              </CardTitle>
+              <CardDescription className="flex items-start gap-1">
+                <MapPin className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+                {discarded ? claim.batch.sppg.name : `${claim.batch.sppg.name} — ${claim.batch.sppg.address}`}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <p className="font-mono text-xl font-bold">
+                  {formatQuantity(claim.quantity, claim.unit)}
+                </p>
+                <p className="text-sm text-muted-foreground">Diklaim {formatDateTime(claim.claimedAt)}</p>
+                {claim.status === "pending" && (
+                  // Klaim batal otomatis bila batch turun kategori, jadi tenggat ambil = batas aman batch.
+                  <p
+                    className={cn(
+                      "mt-1 flex w-fit items-center gap-1 text-sm font-medium",
+                      isNearDeadline(claim.batch.safeUntil, now) &&
+                        "rounded-full bg-warning px-2 py-0.5 text-warning-foreground"
+                    )}
+                  >
+                    <Clock className="size-3.5 shrink-0" aria-hidden />
+                    Ambil sebelum {formatDateTime(claim.batch.safeUntil)} (
+                    {formatTimeLeft(claim.batch.safeUntil, now)})
+                  </p>
+                )}
+                {claim.cancelReason === "degraded" && (
+                  <p className="mt-1 text-sm text-destructive">
+                    Dibatalkan karena kondisi makanan turun ke kategori {claim.batch.category} (
+                    {CATEGORY_LABEL[claim.batch.category]}) sebelum diambil.
+                  </p>
+                )}
+                {claim.cancelReason === "recipient" && (
+                  <p className="mt-1 text-sm text-muted-foreground">Dibatalkan oleh Anda.</p>
+                )}
+              </div>
+              {claim.status === "pending" && (
+                <div className="rounded-lg bg-secondary px-3 py-2 text-center">
+                  <p className="text-xs text-secondary-foreground">Kode ambil</p>
+                  <p className="font-mono text-xl font-bold tracking-widest">
+                    {formatPickupCode(claim.pickupCode)}
+                  </p>
+                </div>
+              )}
+            </CardContent>
+            {claim.status === "pending" && (
+              <CardFooter className="flex flex-wrap items-start justify-between gap-2">
+                <Button asChild variant="outline" className="h-11">
+                  <a href={directionsUrl(claim.batch.sppg.location)} target="_blank" rel="noopener noreferrer">
+                    <Navigation data-icon="inline-start" aria-hidden />
+                    Petunjuk Arah
+                  </a>
+                </Button>
+                <CancelClaimButton claimId={claim.id} />
+              </CardFooter>
             )}
-          </CardContent>
-          {claim.status === "pending" && (
-            <CardFooter className="flex flex-wrap items-start justify-between gap-2">
-              <Button asChild variant="outline" className="h-11">
-                <a href={directionsUrl(claim.batch.sppg.location)} target="_blank" rel="noopener noreferrer">
-                  <Navigation data-icon="inline-start" aria-hidden />
-                  Petunjuk Arah
-                </a>
-              </Button>
-              <CancelClaimButton claimId={claim.id} />
-            </CardFooter>
-          )}
-        </Card>
-      ))}
+          </Card>
+        )
+      })}
     </div>
   )
 }

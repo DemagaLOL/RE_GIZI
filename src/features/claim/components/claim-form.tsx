@@ -58,7 +58,11 @@ export function ClaimForm({
           min={unit === "porsi" ? 1 : 0.1}
           step={unit === "porsi" ? 1 : 0.1}
           max={remaining}
-          defaultValue={Math.min(remaining, unit === "porsi" ? 10 : 5)}
+          defaultValue={
+            state.status === "error" && state.quantity
+              ? state.quantity
+              : Math.min(remaining, unit === "porsi" ? 10 : 5)
+          }
           required
           aria-invalid={state.status === "error" || undefined}
           aria-describedby={state.status === "error" ? "claim-error" : undefined}

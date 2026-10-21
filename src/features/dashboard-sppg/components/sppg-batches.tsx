@@ -11,10 +11,9 @@ import {
   CLAIM_STATUS_LABEL,
   NEXT_CATEGORY,
   getBatches,
-  getCategoryEvents,
-  getClaimsByBatch,
+  getCategoryEventsBySppg,
+  getClaimsBySppg,
   getNow,
-  getRecipients,
   type BatchStatus,
 } from "@/lib/data"
 import { formatDateTime, formatQuantity, formatTimeLeft } from "@/lib/format"
@@ -23,15 +22,28 @@ import { DegradeBatchForm } from "./degrade-batch-form"
 /** Status batch yang masih bisa turun kategori (otomatis maupun manual). */
 const DEGRADABLE: readonly BatchStatus[] = ["available", "reserved"]
 
+/** Kelompokkan item per `batchId` (urutan dalam kelompok dipertahankan). */
+function groupByBatch<T extends { batchId: string }>(items: readonly T[]): Map<string, T[]> {
+  const groups = new Map<string, T[]>()
+  for (const item of items) {
+    const group = groups.get(item.batchId)
+    if (group) group.push(item)
+    else groups.set(item.batchId, [item])
+  }
+  return groups
+}
+
 /** Daftar batch milik satu SPPG beserta klaim tiap batch. Render dalam `<Suspense>`. */
 export async function SppgBatches({ sppgId }: { sppgId: string }) {
-  const [batches, recipients] = await Promise.all([getBatches({ sppgId }), getRecipients()])
-  const [claimsPerBatch, eventsPerBatch] = await Promise.all([
-    Promise.all(batches.map((b) => getClaimsByBatch(b.id))),
-    Promise.all(batches.map((b) => getCategoryEvents(b.id))),
+  // `getBatches` dulu: degradasi yang jatuh tempo diterapkan sebelum klaim & riwayat dibaca.
+  const batches = await getBatches({ sppgId })
+  const [claims, events, now] = await Promise.all([
+    getClaimsBySppg(sppgId),
+    getCategoryEventsBySppg(sppgId),
+    getNow(),
   ])
-  const recipientName = new Map(recipients.map((r) => [r.id, r.name]))
-  const now = await getNow()
+  const claimsByBatch = groupByBatch(claims)
+  const eventsByBatch = groupByBatch(events)
 
   if (batches.length === 0) {
     return (
@@ -50,12 +62,12 @@ export async function SppgBatches({ sppgId }: { sppgId: string }) {
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
-      {batches.map((batch, i) => {
-        const claims = claimsPerBatch[i].filter((c) => c.status !== "cancelled")
+      {batches.map((batch) => {
+        const claims = (claimsByBatch.get(batch.id) ?? []).filter((c) => c.status !== "cancelled")
         const pendingClaims = claims.filter((c) => c.status === "pending").length
         const next = NEXT_CATEGORY[batch.category]
         const degradable = DEGRADABLE.includes(batch.status) && next !== null
-        const events = eventsPerBatch[i]
+        const events = eventsByBatch.get(batch.id) ?? []
         return (
           <Card key={batch.id}>
             <CardHeader>
@@ -82,7 +94,7 @@ export async function SppgBatches({ sppgId }: { sppgId: string }) {
                     <li key={claim.id} className="flex flex-wrap items-center justify-between gap-2 p-3 text-sm">
                       <div className="flex flex-col">
                         <span className="font-medium">
-                          {recipientName.get(claim.recipientId) ?? "Penerima"}
+                          {claim.recipientName}
                         </span>
                         <span className="text-muted-foreground">
                           {formatQuantity(claim.quantity, claim.unit)} · {formatDateTime(claim.claimedAt)}

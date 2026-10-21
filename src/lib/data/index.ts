@@ -20,13 +20,22 @@ export {
   getBatchById,
   getBatches,
   getCategoryEvents,
+  getCategoryEventsBySppg,
   getClaimsByBatch,
   getClaimsByRecipient,
+  getClaimsBySppg,
   getImpactStats,
   getNow,
   getPickupPreview,
 } from "./batches"
-export { advanceClock, getClockState, resetClock, setClock } from "./clock-control"
+export {
+  advanceClock,
+  getClockState,
+  hasFutureData,
+  resetClock,
+  resetDemoData,
+  setClock,
+} from "./clock-control"
 export { isSimClockEnabled } from "./clock"
 export {
   getDemoAccounts,

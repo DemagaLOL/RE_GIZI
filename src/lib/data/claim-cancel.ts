@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm"
 import type { Tx } from "./db/client"
 import { toBatch, toClaim } from "./db/mappers"
 import * as schema from "./db/schema"
+import { roundQuantity } from "./quantity"
 import { deriveBatchStatus } from "./seed"
 import type { CancelClaimInput, Claim, DataResult } from "./types"
 
@@ -36,7 +37,7 @@ export function applyClaimCancellation(
 
   // Klaim pending selalu bersatuan sama dengan batch: setiap degradasi membatalkannya.
   const batch = toBatch(row.batch)
-  const remainingQuantity = batch.remainingQuantity + row.claim.quantity
+  const remainingQuantity = roundQuantity(batch.remainingQuantity + row.claim.quantity, batch.unit)
   const claims = tx
     .select({ status: schema.claims.status })
     .from(schema.claims)

@@ -19,11 +19,16 @@ export async function claimBatchAction(
   }
 
   const batchId = formData.get("batchId")
-  const quantity = Number(formData.get("quantity"))
+  const rawQuantity = formData.get("quantity")
+  const quantityText = typeof rawQuantity === "string" ? rawQuantity : ""
   if (typeof batchId !== "string") return { status: "error", message: "Batch tidak valid." }
 
-  const result = await claimBatch({ batchId, recipientId: session.recipient.id, quantity })
-  if (!result.ok) return { status: "error", message: result.error }
+  const result = await claimBatch({
+    batchId,
+    recipientId: session.recipient.id,
+    quantity: Number(quantityText),
+  })
+  if (!result.ok) return { status: "error", message: result.error, quantity: quantityText }
 
   revalidateClaimPages(batchId)
   return { status: "success", pickupCode: result.data.pickupCode, quantity: result.data.quantity }

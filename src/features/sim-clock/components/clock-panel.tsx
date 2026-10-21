@@ -1,7 +1,7 @@
 "use client"
 
-import { useActionState } from "react"
-import { FastForward, Loader2, Pause, Play, RotateCcw } from "lucide-react"
+import { useActionState, useState } from "react"
+import { DatabaseZap, FastForward, Loader2, Pause, Play, RotateCcw } from "lucide-react"
 import { FoodStatusBadge } from "@/components/shared/food-status-badge"
 import { Button } from "@/components/ui/button"
 import { CATEGORY_ORDER, CLOCK_SPEED_PRESETS, SAFE_WINDOW_HOURS } from "@/lib/data/constants"
@@ -31,9 +31,12 @@ function GroupTitle({ children }: { children: React.ReactNode }) {
  * jam, pindah ke tanggal-jam tertentu, atau kembali ke waktu nyata. Kategori sisa
  * makanan turun otomatis mengikuti jam ini.
  * @param clock Keadaan jam dari server (`getClockState`).
+ * @param futureData Ada data yang dibuat saat jam dimajukan (`hasFutureData`); menampilkan
+ *   peringatan sebelum kembali ke waktu nyata.
  */
-export function ClockPanel({ clock }: { clock: ClockState }) {
+export function ClockPanel({ clock, futureData }: { clock: ClockState; futureData: boolean }) {
   const [state, formAction, pending] = useActionState(clockAction, INITIAL_STATE)
+  const [confirmingReset, setConfirmingReset] = useState(false)
 
   return (
     <form action={formAction} className="flex flex-col gap-8">
@@ -43,7 +46,6 @@ export function ClockPanel({ clock }: { clock: ClockState }) {
           now={clock.now}
           speed={clock.speed}
           paused={clock.paused}
-          refresh
           className="font-mono text-2xl font-bold tabular-nums md:text-4xl"
         />
         <p className="text-sm text-muted-foreground">
@@ -139,7 +141,9 @@ export function ClockPanel({ clock }: { clock: ClockState }) {
             Pindah
           </Button>
         </div>
-        <p className="text-sm text-muted-foreground">Jam hanya bisa dimajukan, tidak dimundurkan.</p>
+        <p className="text-sm text-muted-foreground">
+          Tujuan harus setelah jam aplikasi sekarang; untuk mundur gunakan pilihan di bagian bawah.
+        </p>
       </section>
 
       <section className="flex flex-col gap-3">
@@ -158,20 +162,73 @@ export function ClockPanel({ clock }: { clock: ClockState }) {
         </p>
       </section>
 
-      <div className="flex items-center gap-3">
-        <Button
-          type="submit"
-          name="intent"
-          value="reset"
-          variant="ghost"
-          className="h-11"
-          disabled={pending || !clock.simulated}
-        >
-          <RotateCcw data-icon="inline-start" aria-hidden />
-          Kembali ke waktu nyata
-        </Button>
-        {pending && <Loader2 className="size-4 animate-spin text-muted-foreground" aria-label="Memproses" />}
-      </div>
+      <section className="flex flex-col gap-3">
+        <GroupTitle>Kembali ke waktu nyata</GroupTitle>
+        {clock.simulated && futureData && (
+          <p className="rounded-lg bg-warning px-4 py-3 text-sm text-warning-foreground">
+            Ada sisa makanan atau klaim yang dicatat saat jam dimajukan. Bila jam dikembalikan
+            ke waktu nyata, data itu berada &quot;di masa depan&quot; sehingga batas amannya tidak
+            sesuai lagi (mis. makanan matang tetap kategori A berhari-hari). Gunakan &quot;Reset jam
+            &amp; data demo&quot; untuk memulai ulang dari keadaan bersih.
+          </p>
+        )}
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="submit"
+            name="intent"
+            value="reset"
+            variant="ghost"
+            className="h-11"
+            disabled={pending || !clock.simulated}
+          >
+            <RotateCcw data-icon="inline-start" aria-hidden />
+            Kembali ke waktu nyata
+          </Button>
+          {!confirmingReset && (
+            <Button
+              type="button"
+              variant="outline"
+              className="h-11"
+              disabled={pending}
+              onClick={() => setConfirmingReset(true)}
+            >
+              <DatabaseZap data-icon="inline-start" aria-hidden />
+              Reset jam &amp; data demo
+            </Button>
+          )}
+          {pending && <Loader2 className="size-4 animate-spin text-muted-foreground" aria-label="Memproses" />}
+        </div>
+        {confirmingReset && (
+          <div className="flex flex-col gap-3 rounded-lg border p-3">
+            <p className="text-sm">
+              Kosongkan semua sisa makanan, klaim, dan akun yang didaftarkan sendiri, lalu isi ulang
+              akun contoh dan kembalikan jam ke waktu nyata? Semua pengguna akan keluar. Tindakan ini
+              tidak bisa dibatalkan.
+            </p>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button
+                type="submit"
+                name="intent"
+                value="reset-data"
+                variant="destructive"
+                className="h-11"
+                disabled={pending}
+              >
+                Ya, Reset Semua
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                className="h-11"
+                disabled={pending}
+                onClick={() => setConfirmingReset(false)}
+              >
+                Tidak
+              </Button>
+            </div>
+          </div>
+        )}
+      </section>
     </form>
   )
 }

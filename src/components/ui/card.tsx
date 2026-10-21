@@ -1,5 +1,5 @@
 import * as React from "react"
-import { cn } from "cn"
+import { cn } from "@/lib/utils"
 
 /** Kontainer konten berbingkai; padding 16px di mobile, 24px mulai `md`. */
 function Card({

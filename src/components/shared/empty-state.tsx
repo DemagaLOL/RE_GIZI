@@ -1,6 +1,6 @@
 import * as React from "react"
 import { Inbox, type LucideIcon } from "lucide-react"
-import { cn } from "cn"
+import { cn } from "@/lib/utils"
 
 /** Tampilan saat daftar kosong: ikon, judul, deskripsi, dan aksi opsional (mis. tombol). */
 function EmptyState({

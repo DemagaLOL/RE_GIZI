@@ -2,6 +2,7 @@ import { createHash, randomBytes } from "node:crypto"
 import { asc, eq, like, lte } from "drizzle-orm"
 import { io } from "next/cache"
 import {
+  DISTRICT_MAX_LENGTH,
   PASSWORD_MIN_LENGTH,
   RECIPIENT_TYPE_LABEL,
   RECIPIENT_TYPES,
@@ -14,7 +15,7 @@ import * as schema from "./db/schema"
 import type { AccountRow } from "./db/schema"
 import { isValidGeoPoint } from "./geo"
 import { hashPassword, verifyPassword } from "./password"
-import { DEMO_EMAIL_DOMAIN } from "./seed"
+import { DEMO_EMAIL_DOMAIN, isDemoEmail, isDemoMode } from "./seed"
 import type {
   AuthIdentity,
   DataResult,
@@ -88,17 +89,19 @@ function lockMessage(lockedUntil: number, now: number): string {
 /**
  * Masuk dengan email & kata sandi. Setelah 5 kali gagal, email dikunci 15 menit.
  * Pesan galat sengaja tidak membedakan email tak terdaftar dan kata sandi salah.
+ * Akun contoh hanya bisa dipakai dalam mode demo (`isDemoMode`) dan tidak ikut dikunci —
+ * kata sandinya publik, jadi penguncian hanya memberi orang lain cara memblokir demo.
  */
 export async function signIn(input: SignInInput): Promise<DataResult<SessionGrant>> {
   await io()
   const db = getDb()
   const email = normalizeEmail(input.email)
+  const demo = isDemoEmail(email)
+  if (demo && !isDemoMode()) return { ok: false, error: "Akun contoh tidak aktif di server ini." }
 
-  const throttle = db
-    .select()
-    .from(schema.loginThrottle)
-    .where(eq(schema.loginThrottle.email, email))
-    .get()
+  const throttle = demo
+    ? undefined
+    : db.select().from(schema.loginThrottle).where(eq(schema.loginThrottle.email, email)).get()
   if (throttle && throttle.lockedUntil > Date.now()) {
     return { ok: false, error: lockMessage(throttle.lockedUntil, Date.now()) }
   }
@@ -108,6 +111,7 @@ export async function signIn(input: SignInInput): Promise<DataResult<SessionGran
   const valid = await verifyPassword(input.password, account?.passwordHash ?? (await dummyHash))
   const now = Date.now()
 
+  if (demo && (!account || !valid)) return { ok: false, error: "Email atau kata sandi salah." }
   if (!account || !valid) {
     // Dibaca ulang setelah verifikasi (async) agar percobaan paralel tetap terhitung.
     const current = db
@@ -140,7 +144,11 @@ function validateRegistration(input: RegisterRecipientInput, email: string): str
   if (name.length < 3 || name.length > 100) return "Nama harus 3–100 karakter."
   if (!RECIPIENT_TYPES.includes(input.type)) return "Pilih jenis penerima."
   if (!REGENCIES.includes(input.regency)) return "Pilih kabupaten."
-  if (!input.district.trim()) return "Kecamatan tidak boleh kosong."
+  const district = input.district.trim()
+  if (!district) return "Kecamatan tidak boleh kosong."
+  if (district.length > DISTRICT_MAX_LENGTH) {
+    return `Kecamatan paling banyak ${DISTRICT_MAX_LENGTH} karakter.`
+  }
   if (!EMAIL_PATTERN.test(email) || email.length > 254) return "Format email tidak valid."
   if (input.password.length < PASSWORD_MIN_LENGTH) {
     return `Kata sandi minimal ${PASSWORD_MIN_LENGTH} karakter.`
@@ -241,9 +249,13 @@ export async function revokeSession(token: string): Promise<void> {
 /** Urutan peran di daftar akun contoh. */
 const DEMO_ROLE_ORDER: Record<AccountRow["role"], number> = { sppg: 0, tps: 1, recipient: 2 }
 
-/** Akun contoh (seed) untuk ditampilkan di halaman masuk: SPPG, TPS, lalu penerima. */
+/**
+ * Akun contoh (seed) untuk ditampilkan di halaman masuk: SPPG, TPS, lalu penerima.
+ * Kosong bila bukan mode demo (`isDemoMode`).
+ */
 export async function getDemoAccounts(): Promise<DemoAccount[]> {
   await io()
+  if (!isDemoMode()) return []
   const db = getDb()
   const accounts = db
     .select()

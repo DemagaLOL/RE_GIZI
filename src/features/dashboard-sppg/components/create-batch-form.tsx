@@ -9,14 +9,16 @@ import {
   CATEGORY_UNIT,
   ELIGIBLE_RECIPIENTS,
   FOOD_TYPE_LABEL,
+  MENU_MAX_LENGTH,
+  NOTES_MAX_LENGTH,
   RECIPIENT_TYPE_LABEL,
 } from "@/lib/data/constants"
 import type { FoodType, SurplusCategory } from "@/lib/data/types"
 import { createBatchAction } from "../actions"
 import { COOKED_FIELD, DRY_FIELD } from "../cooked-options"
-import type { DashboardFormState } from "../types"
+import type { CreateBatchFormState } from "../types"
 
-const INITIAL_STATE: DashboardFormState = { status: "idle" }
+const INITIAL_STATE: CreateBatchFormState = { status: "idle" }
 const CATEGORIES: readonly SurplusCategory[] = ["A", "B", "C", "D"]
 
 /** Pilihan jenis makanan untuk kategori A. */
@@ -45,6 +47,12 @@ export function CreateBatchForm() {
   const dry = category === "A" && foodType === "dry"
   const time = dry ? DRY_FIELD : COOKED_FIELD[category]
   const timeName = dry ? "bestBeforeMinutes" : "cookedMinutesAgo"
+  // Isian dikembalikan action saat galat (React mengosongkan form setelah submit).
+  const values = state.status === "error" ? state.values : undefined
+  const timeValue = values?.[timeName]
+  const timeDefault = time.options.some((o) => String(o.value) === timeValue)
+    ? timeValue
+    : time.defaultValue
 
   return (
     <form action={formAction} className="flex flex-col gap-6">
@@ -110,6 +118,8 @@ export function CreateBatchForm() {
           id="menu"
           name="menu"
           required
+          maxLength={MENU_MAX_LENGTH}
+          defaultValue={values?.menu}
           placeholder={dry ? "mis. Roti isi cokelat, biskuit kemasan" : "mis. Nasi, ayam suwir kecap, tumis buncis"}
           className={cn(FIELD_CLASS, "h-11")}
         />
@@ -128,6 +138,7 @@ export function CreateBatchForm() {
             inputMode={unit === "porsi" ? "numeric" : "decimal"}
             min={unit === "porsi" ? 1 : 0.1}
             step={unit === "porsi" ? 1 : 0.1}
+            defaultValue={values?.quantity}
             className={cn(FIELD_CLASS, "h-11")}
           />
         </div>
@@ -140,7 +151,7 @@ export function CreateBatchForm() {
             key={`${category}-${dry ? "dry" : "cooked"}`}
             id={timeName}
             name={timeName}
-            defaultValue={time.defaultValue}
+            defaultValue={timeDefault}
             aria-describedby="time-hint"
             className={cn(FIELD_CLASS, "h-11")}
           >
@@ -164,6 +175,8 @@ export function CreateBatchForm() {
           id="notes"
           name="notes"
           rows={3}
+          maxLength={NOTES_MAX_LENGTH}
+          defaultValue={values?.notes}
           placeholder="mis. Sudah dikemas per porsi, bawa wadah sendiri"
           className={cn(FIELD_CLASS, "py-2")}
         />

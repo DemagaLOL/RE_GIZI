@@ -37,6 +37,11 @@ export const PICKUP_CODE_LENGTH = 6
 /** Panjang minimal kata sandi akun. */
 export const PASSWORD_MIN_LENGTH = 8
 
+/** Panjang maksimal isian teks (divalidasi di data layer, juga `maxLength` di form). */
+export const MENU_MAX_LENGTH = 120
+export const NOTES_MAX_LENGTH = 500
+export const DISTRICT_MAX_LENGTH = 60
+
 /**
  * Jenis penerima yang boleh mengklaim tiap kategori. Hanya penerima yang sesuai
  * yang boleh mengambil (mis. sisa B tidak pernah ke warga). Kategori D tidak bisa diklaim.

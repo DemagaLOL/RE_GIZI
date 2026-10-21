@@ -3,7 +3,6 @@
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import {
-  CATEGORY_LABEL,
   confirmPickup,
   createBatch,
   degradeBatch,
@@ -14,9 +13,27 @@ import {
 import { getSession } from "@/features/session"
 import { formatPickupCode } from "@/lib/format"
 import { COOKED_FIELD, DRY_FIELD } from "./cooked-options"
-import type { DashboardFormState, PickupFormState } from "./types"
+import type {
+  CreateBatchField,
+  CreateBatchFormState,
+  DashboardFormState,
+  PickupFormState,
+} from "./types"
 
 const CATEGORIES: readonly SurplusCategory[] = ["A", "B", "C", "D"]
+const CREATE_BATCH_FIELDS: readonly CreateBatchField[] = [
+  "menu",
+  "quantity",
+  "notes",
+  "cookedMinutesAgo",
+  "bestBeforeMinutes",
+]
+
+/** Nilai teks field form, atau string kosong bila tidak ada/bukan teks. */
+function text(formData: FormData, name: string): string {
+  const value = formData.get(name)
+  return typeof value === "string" ? value : ""
+}
 
 /** Ambil ID SPPG dari sesi, atau `null` bila bukan SPPG. */
 async function currentSppgId(): Promise<string | null> {
@@ -69,14 +86,18 @@ export async function pickupAction(
 
 /** Server Action pendaftaran sisa makanan baru; berhasil → kembali ke dasbor. */
 export async function createBatchAction(
-  _prev: DashboardFormState,
+  _prev: CreateBatchFormState,
   formData: FormData
-): Promise<DashboardFormState> {
+): Promise<CreateBatchFormState> {
+  // React mengosongkan form setelah action selesai; kembalikan isian agar tidak perlu diketik ulang.
+  const values = Object.fromEntries(CREATE_BATCH_FIELDS.map((f) => [f, text(formData, f)]))
+  const fail = (message: string): CreateBatchFormState => ({ status: "error", message, values })
+
   const sppgId = await currentSppgId()
-  if (!sppgId) return { status: "error", message: "Masuk sebagai SPPG terlebih dahulu." }
+  if (!sppgId) return fail("Masuk sebagai SPPG terlebih dahulu.")
 
   const category = CATEGORIES.find((c) => c === formData.get("category"))
-  if (!category) return { status: "error", message: "Pilih kategori sisa makanan." }
+  if (!category) return fail("Pilih kategori sisa makanan.")
 
   // Jam aplikasi (bisa disimulasikan), bukan jam server, agar konsisten dengan batas aman.
   const now = await getNow()
@@ -86,7 +107,7 @@ export async function createBatchAction(
   if (dry) {
     const minutesAhead = Number(formData.get("bestBeforeMinutes"))
     if (!DRY_FIELD.options.some((o) => o.value === minutesAhead)) {
-      return { status: "error", message: "Pilih batas layak makanan kering." }
+      return fail("Pilih batas layak makanan kering.")
     }
     timing = {
       cookedAt: new Date(now).toISOString(),
@@ -95,23 +116,21 @@ export async function createBatchAction(
   } else {
     const minutesAgo = Number(formData.get("cookedMinutesAgo"))
     if (!COOKED_FIELD[category].options.some((o) => o.value === minutesAgo)) {
-      return { status: "error", message: "Pilih umur makanan sejak dimasak." }
+      return fail("Pilih umur makanan sejak dimasak.")
     }
     timing = { cookedAt: new Date(now - minutesAgo * 60_000).toISOString() }
   }
-  const menu = formData.get("menu")
-  const notes = formData.get("notes")
 
   const result = await createBatch({
     sppgId,
     category,
-    menu: typeof menu === "string" ? menu : "",
-    quantity: Number(formData.get("quantity")),
+    menu: values.menu,
+    quantity: Number(values.quantity),
     foodType: dry ? "dry" : "cooked",
     ...timing,
-    notes: typeof notes === "string" ? notes : undefined,
+    notes: values.notes || undefined,
   })
-  if (!result.ok) return { status: "error", message: result.error }
+  if (!result.ok) return fail(result.error)
 
   revalidateListings()
   redirect("/dasbor?baru=1")
@@ -119,7 +138,8 @@ export async function createBatchAction(
 
 /**
  * Server Action SPPG menurunkan kategori batch lebih awal (mis. makanan mulai basi).
- * Klaim yang menunggu diambil dibatalkan oleh data layer.
+ * Klaim yang menunggu diambil dibatalkan oleh data layer. Berhasil → `idle`: kartu batch
+ * dirender ulang dengan badge kategori baru dan riwayatnya sebagai konfirmasi.
  */
 export async function degradeBatchAction(
   _prev: DashboardFormState,
@@ -143,8 +163,5 @@ export async function degradeBatchAction(
   if (!result.ok) return { status: "error", message: result.error }
 
   revalidateListings()
-  return {
-    status: "success",
-    message: `Kategori diturunkan ke ${toCategory} (${CATEGORY_LABEL[toCategory]}).`,
-  }
+  return { status: "idle" }
 }

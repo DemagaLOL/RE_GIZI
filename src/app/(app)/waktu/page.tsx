@@ -4,7 +4,7 @@ import { Container } from "@/components/shared/container"
 import { Skeleton } from "@/components/ui/skeleton"
 import { requireSppgSession } from "@/features/session"
 import { ClockPanel } from "@/features/sim-clock"
-import { getClockState } from "@/lib/data"
+import { getClockState, hasFutureData } from "@/lib/data"
 
 export const metadata: Metadata = {
   title: "Simulasi Waktu",
@@ -12,7 +12,11 @@ export const metadata: Metadata = {
 
 /** Panel jam setelah sesi SPPG dipastikan. */
 async function ClockContent() {
-  const [, clock] = await Promise.all([requireSppgSession(), getClockState()])
+  const [, clock, futureData] = await Promise.all([
+    requireSppgSession(),
+    getClockState(),
+    hasFutureData(),
+  ])
 
   if (!clock.enabled) {
     return (
@@ -22,7 +26,7 @@ async function ClockContent() {
       </p>
     )
   }
-  return <ClockPanel clock={clock} />
+  return <ClockPanel clock={clock} futureData={futureData} />
 }
 
 /** Rute `/waktu`: simulasi waktu untuk demo degradasi kategori (khusus SPPG). */

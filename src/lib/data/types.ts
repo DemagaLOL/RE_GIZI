@@ -138,6 +138,9 @@ export type Claim = {
 /** Klaim beserta batch & SPPG asalnya (hasil join). */
 export type ClaimWithBatch = Claim & { batch: SurplusBatchWithSppg }
 
+/** Klaim beserta nama penerimanya (hasil join), untuk dasbor SPPG. */
+export type ClaimWithRecipient = Claim & { recipientName: string }
+
 /** Input `confirmPickup` dan `getPickupPreview`. */
 export type ConfirmPickupInput = {
   sppgId: string

@@ -15,7 +15,7 @@ import {
   Trash2,
   type LucideIcon,
 } from "lucide-react"
-import { cn } from "cn"
+import { cn } from "@/lib/utils"
 
 /** Nama ikon tautan app shell (string agar bisa dikirim dari Server Component). */
 type AppNavIcon =

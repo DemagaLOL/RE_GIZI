@@ -5,11 +5,12 @@ import {
   advanceClock,
   CLOCK_SPEED_PRESETS,
   resetClock,
+  resetDemoData,
   setClock,
   type ClockState,
   type DataResult,
 } from "@/lib/data"
-import { getSession } from "@/features/session"
+import { getSession, signOut } from "@/features/session"
 import { formatSpeed } from "@/lib/format"
 import { ADVANCE_OPTIONS_HOURS } from "./options"
 import type { ClockFormState } from "./types"
@@ -22,7 +23,8 @@ function toFormState(result: DataResult<ClockState>, message: string): ClockForm
 /**
  * Server Action panel simulasi waktu (khusus SPPG). Aksi dipilih lewat field `intent`:
  * `speed:<n>`, `pause`, `resume`, `advance:<jam>`, `jump` (field `at`, waktu WIB dari
- * `datetime-local`), atau `reset` (kembali ke waktu nyata).
+ * `datetime-local`), `reset` (kembali ke waktu nyata), atau `reset-data` (kembali ke waktu
+ * nyata sekaligus mengosongkan data demo; semua pengguna keluar).
  */
 export async function clockAction(
   _prev: ClockFormState,
@@ -63,6 +65,12 @@ export async function clockAction(
   } else if (kind === "reset") {
     await resetClock()
     state = { status: "success", message: "Jam kembali ke waktu nyata." }
+  } else if (kind === "reset-data") {
+    const result = await resetDemoData()
+    if (!result.ok) return { status: "error", message: result.error }
+    // Semua sesi sudah terhapus; bersihkan cookie lalu arahkan ke halaman masuk (redirect).
+    await signOut()
+    return { status: "idle" }
   } else {
     return { status: "error", message: "Aksi tidak dikenal." }
   }

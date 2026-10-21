@@ -34,7 +34,7 @@ const CONTACT_CONTENT: ContactContent = {
     {
       type: "email",
       label: "Email",
-      value: "danawendra.girinandana@email.com",
+      value: "danawendra.girinandana@gmail.com",
     },
     {
       type: "whatsapp",

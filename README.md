@@ -135,10 +135,11 @@ Semuanya opsional.
 |---|---|---|
 | `DATABASE_PATH` | `data/regizi.db` | Lokasi file SQLite |
 | `SIM_CLOCK` | — | Isi `1` untuk mengaktifkan jam simulasi di mode produksi (di mode pengembangan selalu aktif) |
+| `DEMO_MODE` | — | Isi `1` agar akun demo tampil di halaman masuk dan bisa dipakai di mode produksi (di mode pengembangan selalu aktif). Tanpa ini, login akun `@demo.regizi.id` ditolak karena kata sandinya publik |
 
 ## Akun demo
 
-Semua akun demo memakai kata sandi **`regizi123`**. Penerima baru juga dapat mendaftar sendiri di `/daftar`; akun SPPG dan TPS hanya tersedia dari data awal.
+Semua akun demo memakai kata sandi **`regizi123`**. Di mode produksi akun demo hanya aktif bila `DEMO_MODE=1`, dan akun demo tidak ikut dikunci setelah salah kata sandi berulang. Penerima baru juga dapat mendaftar sendiri di `/daftar`; akun SPPG dan TPS hanya tersedia dari data awal.
 
 | Peran | Email | Nama |
 |---|---|---|

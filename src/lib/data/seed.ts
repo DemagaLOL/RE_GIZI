@@ -55,6 +55,19 @@ export const DEMO_EMAIL_DOMAIN = "demo.regizi.id"
 export const DEMO_PASSWORD = "regizi123"
 
 /**
+ * Mode demo: daftar akun contoh tampil di halaman masuk dan akun contoh bisa dipakai.
+ * Selalu aktif di dev; di produksi hanya bila env `DEMO_MODE=1` (kata sandinya publik).
+ */
+export function isDemoMode(): boolean {
+  return process.env.NODE_ENV !== "production" || process.env.DEMO_MODE === "1"
+}
+
+/** `true` bila `email` (sudah dinormalisasi) milik akun contoh. */
+export function isDemoEmail(email: string): boolean {
+  return email.endsWith(`@${DEMO_EMAIL_DOMAIN}`)
+}
+
+/**
  * Akun contoh: `sppg@demo.regizi.id` untuk SPPG pertama, `sppg2@…`, `sppg3@…` untuk
  * berikutnya, `tps@demo.regizi.id` untuk TPS, dan `<jenis>@demo.regizi.id` untuk penerima
  * (mis. `umkm@…`, `peternak@…`).

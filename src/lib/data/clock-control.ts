@@ -1,3 +1,4 @@
+import { gt } from "drizzle-orm"
 import { io } from "next/cache"
 import {
   applyClockInput,
@@ -7,6 +8,8 @@ import {
   writeClockAnchor,
 } from "./clock"
 import { getDb } from "./db/client"
+import * as schema from "./db/schema"
+import { resetDatabase } from "./seed"
 import type { ClockState, DataResult, SetClockInput } from "./types"
 
 const HOUR = 60 * 60 * 1000
@@ -56,8 +59,41 @@ export async function advanceClock(hours: number): Promise<DataResult<ClockState
 }
 
 /**
+ * `true` bila ada data (batch, klaim, atau riwayat turun kategori) bertanggal setelah
+ * waktu nyata — dibuat saat jam simulasi dimajukan. Data ini tidak konsisten bila jam
+ * dikembalikan ke waktu nyata (lihat `resetClock`).
+ */
+export async function hasFutureData(): Promise<boolean> {
+  await io()
+  const db = getDb()
+  const realNow = new Date(Date.now()).toISOString()
+  return Boolean(
+    db.select({ id: schema.batches.id }).from(schema.batches).where(gt(schema.batches.createdAt, realNow)).get() ??
+      db.select({ id: schema.claims.id }).from(schema.claims).where(gt(schema.claims.claimedAt, realNow)).get() ??
+      db
+        .select({ id: schema.batchCategoryEvents.id })
+        .from(schema.batchCategoryEvents)
+        .where(gt(schema.batchCategoryEvents.occurredAt, realNow))
+        .get()
+  )
+}
+
+/**
+ * Kembalikan jam ke waktu nyata sekaligus kosongkan data demo (batch, klaim, sesi,
+ * akun daftar mandiri) lalu isi ulang akun contoh — setara `npm run db:reset`.
+ * Hanya bila simulasi waktu aktif. Semua pengguna ikut keluar.
+ */
+export async function resetDemoData(): Promise<DataResult<null>> {
+  await io()
+  if (!isSimClockEnabled()) return { ok: false, error: DISABLED_ERROR }
+  resetDatabase(getDb(), Date.now())
+  return { ok: true, data: null }
+}
+
+/**
  * Kembalikan jam ke waktu nyata. Data yang dibuat saat simulasi tetap memakai
- * waktu simulasinya (mis. batch "dimasak" di masa depan akan menunggu waktu nyata menyusul).
+ * waktu simulasinya (mis. batch "dimasak" di masa depan akan menunggu waktu nyata menyusul);
+ * gunakan `resetDemoData` untuk memulai ulang dari keadaan bersih.
  */
 export async function resetClock(): Promise<ClockState> {
   await io()

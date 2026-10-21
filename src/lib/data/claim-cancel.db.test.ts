@@ -101,6 +101,40 @@ describe("applyClaimCancellation", () => {
     assert.equal(cancel(claim.id, "rcp-umkm", COOKED + 5 * HOUR).ok, true)
     assert.equal(getBatch("k5")?.status, "expired")
   })
+
+  it("sisa kg dibulatkan 1 desimal tanpa ekor floating point", () => {
+    // Tanpa pembulatan, 1.1 + 2.2 = 3.3000000000000003.
+    const batch: SurplusBatch = {
+      id: "k7",
+      sppgId: "sppg-01",
+      menu: "Sisa nasi & sayur",
+      category: "B",
+      unit: "kg",
+      quantity: 3.3,
+      remainingQuantity: 1.1,
+      foodType: "cooked",
+      cookedAt: iso(COOKED),
+      safeUntil: iso(COOKED + 24 * HOUR),
+      status: "available",
+      createdAt: iso(COOKED),
+    }
+    db.insert(schema.batches).values(fromBatch(batch)).run()
+    const claim: Claim = {
+      id: "k7-c",
+      batchId: "k7",
+      recipientId: "rcp-peternak",
+      category: "B",
+      unit: "kg",
+      quantity: 2.2,
+      status: "pending",
+      pickupCode: "k7-code",
+      claimedAt: iso(COOKED + HOUR),
+    }
+    db.insert(schema.claims).values(fromClaim(claim)).run()
+
+    assert.equal(cancel(claim.id, "rcp-peternak").ok, true)
+    assert.equal(getBatch("k7")?.remainingQuantity, 3.3)
+  })
 })
 
 describe("applyDegradation", () => {

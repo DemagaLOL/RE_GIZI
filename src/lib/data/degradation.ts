@@ -9,6 +9,7 @@ import {
 import type { Db, Tx } from "./db/client"
 import { fromCategoryEvent, toBatch } from "./db/mappers"
 import * as schema from "./db/schema"
+import { roundQuantity } from "./quantity"
 import type {
   BatchStatus,
   CategoryEvent,
@@ -145,7 +146,10 @@ export function applyDegradation(
       .run()
   }
   // Klaim pending selalu bersatuan sama dengan batch: setiap degradasi membatalkannya.
-  const remaining = batch.remainingQuantity + pending.reduce((sum, c) => sum + c.quantity, 0)
+  const remaining = roundQuantity(
+    batch.remainingQuantity + pending.reduce((sum, c) => sum + c.quantity, 0),
+    batch.unit
+  )
   if (remaining <= 0) return batch
 
   let category = batch.category

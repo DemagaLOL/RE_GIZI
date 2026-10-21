@@ -1,4 +1,4 @@
-import { and, asc, count, eq, inArray, ne, type SQL } from "drizzle-orm"
+import { and, asc, count, desc, eq, inArray, ne, type SQL } from "drizzle-orm"
 import { io } from "next/cache"
 import { randomInt } from "node:crypto"
 import { applyClaimCancellation } from "./claim-cancel"
@@ -8,6 +8,8 @@ import {
   CATEGORY_UNIT,
   DRY_MAX_DAYS,
   ELIGIBLE_RECIPIENTS,
+  MENU_MAX_LENGTH,
+  NOTES_MAX_LENGTH,
   PICKUP_CODE_LENGTH,
   SAFE_WINDOW_HOURS,
 } from "./constants"
@@ -28,7 +30,9 @@ import {
   degradeDueBatches,
   planManualDegradation,
 } from "./degradation"
+import { formatQuantity } from "../format"
 import { distanceKm } from "./geo"
+import { roundQuantity, validateQuantity } from "./quantity"
 import { deriveBatchStatus } from "./seed"
 import type {
   BatchFilter,
@@ -38,6 +42,7 @@ import type {
   Claim,
   ClaimBatchInput,
   ClaimWithBatch,
+  ClaimWithRecipient,
   ConfirmPickupInput,
   CreateBatchInput,
   DataResult,
@@ -174,6 +179,36 @@ export async function getClaimsByBatch(batchId: string): Promise<Claim[]> {
     .all()
     .map(toClaim)
     .sort((a, b) => Date.parse(b.claimedAt) - Date.parse(a.claimedAt))
+}
+
+/**
+ * Semua klaim pada batch milik satu SPPG beserta nama penerimanya, terbaru dulu.
+ * Satu query untuk seluruh dasbor (kelompokkan per `batchId` di pemanggil).
+ */
+export async function getClaimsBySppg(sppgId: string): Promise<ClaimWithRecipient[]> {
+  await io()
+  return getDb()
+    .select({ claim: schema.claims, recipientName: schema.recipients.name })
+    .from(schema.claims)
+    .innerJoin(schema.batches, eq(schema.claims.batchId, schema.batches.id))
+    .innerJoin(schema.recipients, eq(schema.claims.recipientId, schema.recipients.id))
+    .where(eq(schema.batches.sppgId, sppgId))
+    .orderBy(desc(schema.claims.claimedAt))
+    .all()
+    .map((r) => ({ ...toClaim(r.claim), recipientName: r.recipientName }))
+}
+
+/** Riwayat turun kategori semua batch milik satu SPPG, terlama dulu. */
+export async function getCategoryEventsBySppg(sppgId: string): Promise<CategoryEvent[]> {
+  await io()
+  return getDb()
+    .select({ event: schema.batchCategoryEvents })
+    .from(schema.batchCategoryEvents)
+    .innerJoin(schema.batches, eq(schema.batchCategoryEvents.batchId, schema.batches.id))
+    .where(eq(schema.batches.sppgId, sppgId))
+    .orderBy(asc(schema.batchCategoryEvents.occurredAt))
+    .all()
+    .map((r) => toCategoryEvent(r.event))
 }
 
 /** Klaim milik satu penerima beserta batch & SPPG-nya, terbaru dulu. */
@@ -338,14 +373,12 @@ export async function getImpactStats(filter: { sppgId?: string } = {}): Promise<
     if (claim.status === "picked_up") stats.distributed[claim.category] += claim.quantity
     if (claim.status === "pending") stats.pendingClaims += 1
   }
+  // Hindari ekor desimal floating point (mis. 12.400000000000002).
+  for (const category of CATEGORIES) {
+    stats.distributed[category] = roundQuantity(stats.distributed[category], CATEGORY_UNIT[category])
+  }
+  stats.discardedKg = roundQuantity(stats.discardedKg, "kg")
   return stats
-}
-
-/** Validasi jumlah: harus positif; bilangan bulat bila satuannya porsi. */
-function validateQuantity(quantity: number, unit: SurplusBatch["unit"]): string | null {
-  if (!Number.isFinite(quantity) || quantity <= 0) return "Jumlah harus lebih dari 0."
-  if (unit === "porsi" && !Number.isInteger(quantity)) return "Jumlah porsi harus bilangan bulat."
-  return null
 }
 
 /**
@@ -367,6 +400,13 @@ export async function createBatch(input: CreateBatchInput): Promise<DataResult<S
   if (!sppg) return { ok: false, error: "SPPG tidak ditemukan." }
   const menu = input.menu.trim()
   if (!menu) return { ok: false, error: "Menu/isi tidak boleh kosong." }
+  if (menu.length > MENU_MAX_LENGTH) {
+    return { ok: false, error: `Menu/isi paling banyak ${MENU_MAX_LENGTH} karakter.` }
+  }
+  const notes = input.notes?.trim() || undefined
+  if (notes && notes.length > NOTES_MAX_LENGTH) {
+    return { ok: false, error: `Catatan paling banyak ${NOTES_MAX_LENGTH} karakter.` }
+  }
 
   const unit = CATEGORY_UNIT[input.category]
   const quantityError = validateQuantity(input.quantity, unit)
@@ -423,7 +463,7 @@ export async function createBatch(input: CreateBatchInput): Promise<DataResult<S
     safeUntil: new Date(safeUntilMs).toISOString(),
     ...(bestBeforeMs !== undefined && { bestBefore: new Date(bestBeforeMs).toISOString() }),
     status: discarded ? "discarded" : "available",
-    notes: input.notes?.trim() || undefined,
+    notes,
     createdAt: new Date(now).toISOString(),
   }
   db.insert(schema.batches).values(fromBatch(batch)).run()
@@ -496,7 +536,7 @@ export async function claimBatch(input: ClaimBatchInput): Promise<DataResult<Cla
       if (input.quantity > batch.remainingQuantity) {
         return {
           ok: false,
-          error: `Jumlah melebihi sisa (${batch.remainingQuantity} ${batch.unit}).`,
+          error: `Jumlah melebihi sisa (${formatQuantity(batch.remainingQuantity, batch.unit)}).`,
         }
       }
 
@@ -513,7 +553,7 @@ export async function claimBatch(input: ClaimBatchInput): Promise<DataResult<Cla
       }
       tx.insert(schema.claims).values(fromClaim(claim)).run()
 
-      const remainingQuantity = batch.remainingQuantity - input.quantity
+      const remainingQuantity = roundQuantity(batch.remainingQuantity - input.quantity, batch.unit)
       tx.update(schema.batches)
         .set({ remainingQuantity })
         .where(eq(schema.batches.id, batch.id))
