@@ -108,6 +108,8 @@ npm run dev
 
 Buka <http://localhost:3000>. Tidak perlu menyiapkan basis data secara manual: saat pertama diakses, file `data/regizi.db` dibuat, dimigrasi, dan diisi akun demo secara otomatis.
 
+Data awal hanya diisi ke basis data yang masih kosong. Bila `data/regizi.db` sudah ada dari versi sebelumnya, jalankan `npm run db:reset` agar akun dan lokasi demo terbaru dipakai.
+
 Untuk build produksi:
 
 ```bash
@@ -139,7 +141,7 @@ Semuanya opsional.
 
 ## Akun demo
 
-Semua akun demo memakai kata sandi **`regizi123`**. Di mode produksi akun demo hanya aktif bila `DEMO_MODE=1`, dan akun demo tidak ikut dikunci setelah salah kata sandi berulang. Penerima baru juga dapat mendaftar sendiri di `/daftar`; akun SPPG dan TPS hanya tersedia dari data awal.
+Tersedia satu akun untuk setiap peran. Semua akun demo memakai kata sandi **`regizi123`**. Di mode produksi akun demo hanya aktif bila `DEMO_MODE=1`, dan akun demo tidak ikut dikunci setelah salah kata sandi berulang. Penerima baru juga dapat mendaftar sendiri di `/daftar`; akun SPPG dan TPS hanya tersedia dari data awal.
 
 | Peran | Email | Nama |
 |---|---|---|
@@ -163,7 +165,9 @@ Menunggu 4 jam sungguhan tidak praktis untuk demo, jadi seluruh waktu domain sis
 4. Batch turun ke Kategori B, klaim yang tertunda dibatalkan, dan batch kini tampil untuk peternak. Riwayat perubahannya dapat dilihat di detail batch.
 5. Lanjutkan sampai Kategori D, lalu masuk sebagai `tps@demo.regizi.id` dan tandai batch "Sudah Diangkut".
 
-Sesi login tetap memakai waktu nyata, sehingga mempercepat jam tidak membuat sesi kedaluwarsa. Gunakan `npm run db:reset` untuk memulai ulang dari keadaan bersih.
+Sesi login tetap memakai waktu nyata, sehingga mempercepat jam tidak membuat sesi kedaluwarsa.
+
+Jam simulasi tidak dapat dimundurkan. Untuk memulai ulang dari keadaan bersih, tekan **Reset jam & data demo** di `/waktu` (tersedia dalam mode demo) atau jalankan `npm run db:reset`. Keduanya mengosongkan seluruh data dan mengisi ulang akun demo.
 
 ## Halaman aplikasi
 
@@ -233,7 +237,7 @@ Migrasi diterapkan otomatis saat aplikasi berjalan.
 npm test
 ```
 
-Menjalankan 46 tes unit untuk aturan degradasi (termasuk makanan kering), pembatalan klaim, pengangkutan TPS, jam simulasi, dan perhitungan jarak. Sebagian tes berjalan terhadap basis data SQLite sementara.
+Menjalankan 52 tes unit untuk aturan degradasi (termasuk makanan kering), pembatalan klaim, pengangkutan TPS, jam simulasi, validasi dan pembulatan jumlah, serta perhitungan jarak. Sebagian tes berjalan terhadap basis data SQLite sementara.
 
 Tes untuk prototipe Python di `api/`:
 
