@@ -6,16 +6,13 @@ import { hashPasswordSync } from "./password"
 import type { BatchStatus, Claim, Recipient, Sppg, Tps } from "./types"
 
 /**
- * Data awal (fiktif) untuk demonstrasi: beberapa SPPG di dua kabupaten (agar urutan
- * jarak terlihat), satu TPS, dan satu akun untuk tiap jenis penerima, tanpa sisa makanan maupun
- * klaim — demo dimulai dari kosong untuk menunjukkan alur memasukkan (SPPG) dan
- * mengambil (penerima).
+ * Data awal untuk demonstrasi: satu SPPG (lokasi Dapur SPPG Blater, Kalimanah), satu TPS,
+ * dan satu akun untuk tiap jenis penerima, tanpa sisa makanan maupun klaim — demo dimulai
+ * dari kosong untuk menunjukkan alur memasukkan (SPPG) dan mengambil (penerima).
  */
 
 export const SEED_SPPG: readonly Sppg[] = [
-  { id: "sppg-01", name: "SPPG Purbalingga Kota 1", operator: "Yayasan Gizi Perwira", address: "Jl. Jend. Sudirman No. 45, Purbalingga Lor", district: "Purbalingga", regency: "Purbalingga", location: { lat: -7.3886, lng: 109.3634 }, dailyCapacity: 3200 },
-  { id: "sppg-02", name: "SPPG Bukateja 1", operator: "Yayasan Lumbung Gizi Bukateja", address: "Jl. Raya Bukateja No. 12, Bukateja", district: "Bukateja", regency: "Purbalingga", location: { lat: -7.4317, lng: 109.4243 }, dailyCapacity: 2800 },
-  { id: "sppg-03", name: "SPPG Purwokerto Timur 1", operator: "Yayasan Satria Sehat", address: "Jl. Jend. Gatot Subroto No. 30, Purwokerto Timur", district: "Purwokerto Timur", regency: "Banyumas", location: { lat: -7.4245, lng: 109.2390 }, dailyCapacity: 3500 },
+  { id: "sppg-01", name: "SPPG Blater", operator: "Yayasan Gizi Perwira", address: "Desa Blater, Kalimanah", district: "Kalimanah", regency: "Purbalingga", location: { lat: -7.4306935, lng: 109.3356508 }, dailyCapacity: 3200 },
 ]
 
 /** Satu penerima per jenis, `id` = `rcp-<jenis>`. */
@@ -68,8 +65,8 @@ export function isDemoEmail(email: string): boolean {
 }
 
 /**
- * Akun contoh: `sppg@demo.regizi.id` untuk SPPG pertama, `sppg2@…`, `sppg3@…` untuk
- * berikutnya, `tps@demo.regizi.id` untuk TPS, dan `<jenis>@demo.regizi.id` untuk penerima
+ * Akun contoh: `sppg@demo.regizi.id` untuk SPPG pertama (`sppg2@…` dst. bila ada
+ * lebih dari satu), `tps@demo.regizi.id` untuk TPS, dan `<jenis>@demo.regizi.id` untuk penerima
  * (mis. `umkm@…`, `peternak@…`).
  * Hash dihitung sekali lalu dipakai bersama (semua kata sandinya sama).
  */

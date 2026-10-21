@@ -4,7 +4,7 @@ import { Container } from "@/components/shared/container"
 import { Skeleton } from "@/components/ui/skeleton"
 import { requireSppgSession } from "@/features/session"
 import { ClockPanel } from "@/features/sim-clock"
-import { getClockState, hasFutureData } from "@/lib/data"
+import { canResetDemoData, getClockState, hasFutureData } from "@/lib/data"
 
 export const metadata: Metadata = {
   title: "Simulasi Waktu",
@@ -26,7 +26,7 @@ async function ClockContent() {
       </p>
     )
   }
-  return <ClockPanel clock={clock} futureData={futureData} />
+  return <ClockPanel clock={clock} futureData={futureData} canResetData={canResetDemoData()} />
 }
 
 /** Rute `/waktu`: simulasi waktu untuk demo degradasi kategori (khusus SPPG). */

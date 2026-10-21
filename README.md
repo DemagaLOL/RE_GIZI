@@ -143,9 +143,7 @@ Semua akun demo memakai kata sandi **`regizi123`**. Di mode produksi akun demo h
 
 | Peran | Email | Nama |
 |---|---|---|
-| SPPG | `sppg@demo.regizi.id` | SPPG Purbalingga Kota 1 |
-| SPPG | `sppg2@demo.regizi.id` | SPPG Bukateja 1 |
-| SPPG | `sppg3@demo.regizi.id` | SPPG Purwokerto Timur 1 |
+| SPPG | `sppg@demo.regizi.id` | SPPG Blater (Kalimanah, Purbalingga) |
 | Penerima · UMKM | `umkm@demo.regizi.id` | Warung Makan Bu Sri |
 | Penerima · Warga | `warga@demo.regizi.id` | Dasawisma Melati RW 02 |
 | Penerima · Peternak | `peternak@demo.regizi.id` | Kelompok Budidaya Lele Mina Makmur |
@@ -153,7 +151,7 @@ Semua akun demo memakai kata sandi **`regizi123`**. Di mode produksi akun demo h
 | Penerima · Komposter | `komposter@demo.regizi.id` | Rumah Kompos Perwira |
 | TPS | `tps@demo.regizi.id` | TPST Purbalingga |
 
-Data contoh mencakup wilayah percontohan Kabupaten Purbalingga dan Banyumas.
+Data contoh berada di Kabupaten Purbalingga, dengan SPPG di Desa Blater, Kalimanah.
 
 ## Mendemokan degradasi dengan jam simulasi
 

@@ -30,6 +30,7 @@ export {
 } from "./batches"
 export {
   advanceClock,
+  canResetDemoData,
   getClockState,
   hasFutureData,
   resetClock,

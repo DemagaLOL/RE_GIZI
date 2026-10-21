@@ -150,6 +150,8 @@ function validateRegistration(input: RegisterRecipientInput, email: string): str
     return `Kecamatan paling banyak ${DISTRICT_MAX_LENGTH} karakter.`
   }
   if (!EMAIL_PATTERN.test(email) || email.length > 254) return "Format email tidak valid."
+  // Domain demo khusus akun contoh (sandi publik, bebas penguncian) — tidak bisa didaftarkan.
+  if (isDemoEmail(email)) return "Email ini tidak bisa dipakai untuk mendaftar."
   if (input.password.length < PASSWORD_MIN_LENGTH) {
     return `Kata sandi minimal ${PASSWORD_MIN_LENGTH} karakter.`
   }

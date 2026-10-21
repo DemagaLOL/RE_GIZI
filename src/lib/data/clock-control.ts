@@ -9,7 +9,7 @@ import {
 } from "./clock"
 import { getDb } from "./db/client"
 import * as schema from "./db/schema"
-import { resetDatabase } from "./seed"
+import { isDemoMode, resetDatabase } from "./seed"
 import type { ClockState, DataResult, SetClockInput } from "./types"
 
 const HOUR = 60 * 60 * 1000
@@ -81,13 +81,19 @@ export async function hasFutureData(): Promise<boolean> {
 /**
  * Kembalikan jam ke waktu nyata sekaligus kosongkan data demo (batch, klaim, sesi,
  * akun daftar mandiri) lalu isi ulang akun contoh — setara `npm run db:reset`.
- * Hanya bila simulasi waktu aktif. Semua pengguna ikut keluar.
+ * Hanya bila simulasi waktu aktif **dan** mode demo (`canResetDemoData`) — tanpa itu
+ * tombol ini bisa menghapus akun & data asli. Semua pengguna ikut keluar.
  */
 export async function resetDemoData(): Promise<DataResult<null>> {
   await io()
-  if (!isSimClockEnabled()) return { ok: false, error: DISABLED_ERROR }
+  if (!canResetDemoData()) return { ok: false, error: "Reset data hanya tersedia dalam mode demo." }
   resetDatabase(getDb(), Date.now())
   return { ok: true, data: null }
+}
+
+/** `true` bila `resetDemoData` diizinkan: simulasi waktu aktif dan mode demo (`isDemoMode`). */
+export function canResetDemoData(): boolean {
+  return isSimClockEnabled() && isDemoMode()
 }
 
 /**

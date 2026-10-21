@@ -533,10 +533,12 @@ export async function claimBatch(input: ClaimBatchInput): Promise<DataResult<Cla
 
       const quantityError = validateQuantity(input.quantity, batch.unit)
       if (quantityError) return { ok: false, error: quantityError }
-      if (input.quantity > batch.remainingQuantity) {
+      // Sisa dibulatkan dulu: data lama bisa tersimpan dengan ekor floating point (0,0999… kg).
+      const available = roundQuantity(batch.remainingQuantity, batch.unit)
+      if (input.quantity > available) {
         return {
           ok: false,
-          error: `Jumlah melebihi sisa (${formatQuantity(batch.remainingQuantity, batch.unit)}).`,
+          error: `Jumlah melebihi sisa (${formatQuantity(available, batch.unit)}).`,
         }
       }
 
@@ -553,7 +555,8 @@ export async function claimBatch(input: ClaimBatchInput): Promise<DataResult<Cla
       }
       tx.insert(schema.claims).values(fromClaim(claim)).run()
 
-      const remainingQuantity = roundQuantity(batch.remainingQuantity - input.quantity, batch.unit)
+      // `Math.max`: hindari -0 / sisa negatif dari ekor floating point data lama.
+      const remainingQuantity = Math.max(0, roundQuantity(available - input.quantity, batch.unit))
       tx.update(schema.batches)
         .set({ remainingQuantity })
         .where(eq(schema.batches.id, batch.id))

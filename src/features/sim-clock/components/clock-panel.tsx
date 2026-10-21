@@ -31,10 +31,18 @@ function GroupTitle({ children }: { children: React.ReactNode }) {
  * jam, pindah ke tanggal-jam tertentu, atau kembali ke waktu nyata. Kategori sisa
  * makanan turun otomatis mengikuti jam ini.
  * @param clock Keadaan jam dari server (`getClockState`).
- * @param futureData Ada data yang dibuat saat jam dimajukan (`hasFutureData`); menampilkan
- *   peringatan sebelum kembali ke waktu nyata.
+ * @param futureData Ada data bertanggal setelah waktu nyata (`hasFutureData`); menampilkan peringatan.
+ * @param canResetData Tombol "Reset jam & data demo" tersedia (`canResetDemoData`, mode demo).
  */
-export function ClockPanel({ clock, futureData }: { clock: ClockState; futureData: boolean }) {
+export function ClockPanel({
+  clock,
+  futureData,
+  canResetData,
+}: {
+  clock: ClockState
+  futureData: boolean
+  canResetData: boolean
+}) {
   const [state, formAction, pending] = useActionState(clockAction, INITIAL_STATE)
   const [confirmingReset, setConfirmingReset] = useState(false)
 
@@ -164,12 +172,14 @@ export function ClockPanel({ clock, futureData }: { clock: ClockState; futureDat
 
       <section className="flex flex-col gap-3">
         <GroupTitle>Kembali ke waktu nyata</GroupTitle>
-        {clock.simulated && futureData && (
+        {futureData && (
           <p className="rounded-lg bg-warning px-4 py-3 text-sm text-warning-foreground">
-            Ada sisa makanan atau klaim yang dicatat saat jam dimajukan. Bila jam dikembalikan
-            ke waktu nyata, data itu berada &quot;di masa depan&quot; sehingga batas amannya tidak
-            sesuai lagi (mis. makanan matang tetap kategori A berhari-hari). Gunakan &quot;Reset jam
-            &amp; data demo&quot; untuk memulai ulang dari keadaan bersih.
+            Ada sisa makanan atau klaim yang dicatat saat jam dimajukan. Di waktu nyata, data itu
+            berada &quot;di masa depan&quot; sehingga batas amannya tidak sesuai lagi (mis. makanan
+            matang tetap kategori A berhari-hari).
+            {canResetData
+              ? " Gunakan \"Reset jam & data demo\" untuk memulai ulang dari keadaan bersih."
+              : " Kosongkan data dengan npm run db:reset untuk memulai ulang."}
           </p>
         )}
         <div className="flex flex-wrap items-center gap-2">
@@ -184,7 +194,7 @@ export function ClockPanel({ clock, futureData }: { clock: ClockState; futureDat
             <RotateCcw data-icon="inline-start" aria-hidden />
             Kembali ke waktu nyata
           </Button>
-          {!confirmingReset && (
+          {canResetData && !confirmingReset && (
             <Button
               type="button"
               variant="outline"
@@ -198,7 +208,7 @@ export function ClockPanel({ clock, futureData }: { clock: ClockState; futureDat
           )}
           {pending && <Loader2 className="size-4 animate-spin text-muted-foreground" aria-label="Memproses" />}
         </div>
-        {confirmingReset && (
+        {canResetData && confirmingReset && (
           <div className="flex flex-col gap-3 rounded-lg border p-3">
             <p className="text-sm">
               Kosongkan semua sisa makanan, klaim, dan akun yang didaftarkan sendiri, lalu isi ulang
