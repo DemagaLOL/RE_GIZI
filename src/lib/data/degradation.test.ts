@@ -85,6 +85,47 @@ describe("planManualDegradation", () => {
   })
 })
 
+describe("makanan kering (bestBefore)", () => {
+  // Dicatat di COOKED, layak dikonsumsi 3 hari lagi.
+  const BEST_BEFORE = COOKED + 72 * HOUR
+  const dry = {
+    category: "A" as const,
+    cookedAt: iso(COOKED),
+    safeUntil: iso(BEST_BEFORE),
+    bestBefore: iso(BEST_BEFORE),
+  }
+
+  it("melewati jam ke-4 sejak dicatat tetap A sampai batas layak", () => {
+    assert.deepEqual(planDegradation(dry, COOKED + 4 * HOUR), [])
+    assert.deepEqual(planDegradation(dry, BEST_BEFORE - 1), [])
+  })
+
+  it("tepat di batas layak turun ke B dengan batas + 20 jam", () => {
+    const steps = planDegradation(dry, BEST_BEFORE)
+    assert.deepEqual(
+      steps.map((s) => [s.from, s.to, s.at, s.safeUntil]),
+      [["A", "B", BEST_BEFORE, BEST_BEFORE + 20 * HOUR]]
+    )
+  })
+
+  it("lompat jauh: A→B→C→D di batas, +20 jam, dan +68 jam", () => {
+    const steps = planDegradation(dry, BEST_BEFORE + 100 * HOUR)
+    assert.deepEqual(
+      steps.map((s) => [s.from, s.to, s.at]),
+      [
+        ["A", "B", BEST_BEFORE],
+        ["B", "C", BEST_BEFORE + 20 * HOUR],
+        ["C", "D", BEST_BEFORE + 68 * HOUR],
+      ]
+    )
+  })
+
+  it("manual A→C memakai batas C = batas layak + 68 jam", () => {
+    const [step] = planManualDegradation(dry, "C", COOKED + HOUR)
+    assert.equal(step.safeUntil, BEST_BEFORE + 68 * HOUR)
+  })
+})
+
 describe("convertQuantity", () => {
   it("porsi → kg memakai 0,4 kg/porsi, dibulatkan 1 desimal", () => {
     assert.equal(convertQuantity(50, "porsi", "kg"), 20)

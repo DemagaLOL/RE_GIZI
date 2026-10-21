@@ -6,6 +6,7 @@ import { simNow } from "./clock"
 import {
   CATEGORY_LABEL,
   CATEGORY_UNIT,
+  DRY_MAX_DAYS,
   ELIGIBLE_RECIPIENTS,
   PICKUP_CODE_LENGTH,
   SAFE_WINDOW_HOURS,
@@ -49,6 +50,7 @@ import type {
 } from "./types"
 
 const HOUR = 60 * 60 * 1000
+const DAY = 24 * HOUR
 /** Toleransi jam perangkat yang sedikit maju saat mengisi `cookedAt`. */
 const CLOCK_SKEW_MS = 5 * 60 * 1000
 
@@ -348,8 +350,9 @@ function validateQuantity(quantity: number, unit: SurplusBatch["unit"]): string 
 
 /**
  * SPPG mendaftarkan sisa makanan baru. `safeUntil` default = `cookedAt` + jendela
- * aman kategori (A 4 jam, B 24 jam, C 72 jam). Kategori D hanya dicatat dengan
- * status `discarded` dan tidak bisa diklaim.
+ * aman kategori (A 4 jam, B 24 jam, C 72 jam). Makanan kering (`foodType: "dry"`,
+ * hanya A) memakai `bestBefore` sebagai batas aman, paling lama `DRY_MAX_DAYS` hari.
+ * Kategori D hanya dicatat dengan status `discarded` dan tidak bisa diklaim.
  */
 export async function createBatch(input: CreateBatchInput): Promise<DataResult<SurplusBatch>> {
   await io()
@@ -375,12 +378,29 @@ export async function createBatch(input: CreateBatchInput): Promise<DataResult<S
     return { ok: false, error: "Waktu masak tidak boleh di masa depan." }
   }
 
+  // Makanan kering (roti, biskuit, dsb.): batas aman = batas layak pilihan SPPG, bukan 4 jam.
+  const foodType = input.foodType ?? "cooked"
+  let bestBeforeMs: number | undefined
+  if (foodType === "dry") {
+    if (input.category !== "A") {
+      return { ok: false, error: "Makanan kering hanya bisa didaftarkan sebagai kategori A." }
+    }
+    bestBeforeMs = input.bestBefore ? Date.parse(input.bestBefore) : Number.NaN
+    if (Number.isNaN(bestBeforeMs) || bestBeforeMs <= now) {
+      return { ok: false, error: "Batas layak makanan kering harus setelah waktu sekarang." }
+    }
+    if (bestBeforeMs > now + DRY_MAX_DAYS * DAY + CLOCK_SKEW_MS) {
+      return { ok: false, error: `Batas layak makanan kering paling lama ${DRY_MAX_DAYS} hari lagi.` }
+    }
+  }
+
   const discarded = input.category === "D"
   const safeUntilMs = discarded
     ? cookedMs
-    : input.safeUntil
-      ? Date.parse(input.safeUntil)
-      : cookedMs + SAFE_WINDOW_HOURS[input.category] * HOUR
+    : (bestBeforeMs ??
+      (input.safeUntil
+        ? Date.parse(input.safeUntil)
+        : cookedMs + SAFE_WINDOW_HOURS[input.category] * HOUR))
   if (!discarded) {
     if (Number.isNaN(safeUntilMs) || safeUntilMs <= cookedMs) {
       return { ok: false, error: "Batas aman harus setelah waktu masak." }
@@ -398,8 +418,10 @@ export async function createBatch(input: CreateBatchInput): Promise<DataResult<S
     unit,
     quantity: input.quantity,
     remainingQuantity: input.quantity,
+    foodType,
     cookedAt: new Date(cookedMs).toISOString(),
     safeUntil: new Date(safeUntilMs).toISOString(),
+    ...(bestBeforeMs !== undefined && { bestBefore: new Date(bestBeforeMs).toISOString() }),
     status: discarded ? "discarded" : "available",
     notes: input.notes?.trim() || undefined,
     createdAt: new Date(now).toISOString(),

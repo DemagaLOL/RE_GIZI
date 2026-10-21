@@ -21,7 +21,7 @@ import type {
 /**
  * Degradasi kategori sisa makanan: A (layak konsumsi) → B (pakan) → C (kompos) →
  * D (dibuang). Batas tiap kategori kumulatif sejak `cookedAt` (`SAFE_WINDOW_HOURS`:
- * 4, 24, 72 jam). Saat turun, klaim `pending` dibatalkan (demi keamanan pangan) dan
+ * 4, 24, 72 jam); untuk makanan kering jendela digeser ke `bestBefore` (lihat `windowBase`). Saat turun, klaim `pending` dibatalkan (demi keamanan pangan) dan
  * jumlahnya kembali ke sisa, satuan dikonversi (porsi → kg), dan setiap langkah dicatat
  * di `batch_category_events`.
  *
@@ -45,17 +45,28 @@ export type DegradationStep = {
 }
 
 /** Bagian batch yang dibutuhkan untuk merencanakan degradasi. */
-type BatchTiming = Pick<SurplusBatch, "category" | "cookedAt" | "safeUntil">
+type BatchTiming = Pick<SurplusBatch, "category" | "cookedAt" | "safeUntil"> &
+  Pick<Partial<SurplusBatch>, "bestBefore">
 
 /** `true` bila `to` lebih rendah (lebih buruk) dari `from`. */
 export function isLowerCategory(from: SurplusCategory, to: SurplusCategory): boolean {
   return CATEGORY_ORDER.indexOf(to) > CATEGORY_ORDER.indexOf(from)
 }
 
-/** Batas aman kategori `category` untuk makanan yang dimasak `cookedMs`, minimal `notBefore`. */
-function safeUntilFor(category: SurplusCategory, cookedMs: number, notBefore: number): number {
+/**
+ * Titik awal jendela kumulatif (epoch ms). Makanan matang: `cookedAt`. Makanan kering:
+ * digeser agar batas A jatuh tepat di `bestBefore`, sehingga B berlaku sampai `bestBefore`
+ * + 20 jam dan C sampai `bestBefore` + 68 jam (selisih yang sama dengan 4/24/72 jam).
+ */
+function windowBase(batch: BatchTiming): number {
+  if (batch.bestBefore) return Date.parse(batch.bestBefore) - SAFE_WINDOW_HOURS.A * HOUR
+  return Date.parse(batch.cookedAt)
+}
+
+/** Batas aman kategori `category` untuk jendela yang dimulai `baseMs`, minimal `notBefore`. */
+function safeUntilFor(category: SurplusCategory, baseMs: number, notBefore: number): number {
   if (category === "D") return notBefore
-  return Math.max(cookedMs + SAFE_WINDOW_HOURS[category] * HOUR, notBefore)
+  return Math.max(baseMs + SAFE_WINDOW_HOURS[category] * HOUR, notBefore)
 }
 
 /**
@@ -64,14 +75,14 @@ function safeUntilFor(category: SurplusCategory, cookedMs: number, notBefore: nu
  * @returns Daftar kosong bila belum lewat batas aman atau sudah kategori D.
  */
 export function planDegradation(batch: BatchTiming, now: number): DegradationStep[] {
-  const cookedMs = Date.parse(batch.cookedAt)
+  const baseMs = windowBase(batch)
   const steps: DegradationStep[] = []
   let category = batch.category
   let safeUntil = Date.parse(batch.safeUntil)
 
   for (let next = NEXT_CATEGORY[category]; next && safeUntil <= now; next = NEXT_CATEGORY[category]) {
     const at = safeUntil
-    safeUntil = safeUntilFor(next, cookedMs, at)
+    safeUntil = safeUntilFor(next, baseMs, at)
     steps.push({ from: category, to: next, at, safeUntil, reason: "auto" })
     category = next
   }
@@ -80,7 +91,8 @@ export function planDegradation(batch: BatchTiming, now: number): DegradationSte
 
 /**
  * Langkah turun manual ke `to` pada `now` (boleh melompat, mis. A → D). Batas aman
- * kategori tujuan mengikuti jendelanya sejak `cookedAt`, tetapi tidak sebelum `now`.
+ * kategori tujuan mengikuti jendelanya sejak `cookedAt` (atau dari `bestBefore` untuk
+ * makanan kering), tetapi tidak sebelum `now`.
  * @returns Daftar kosong bila `to` tidak lebih rendah dari kategori sekarang.
  */
 export function planManualDegradation(
@@ -89,7 +101,7 @@ export function planManualDegradation(
   now: number
 ): DegradationStep[] {
   if (!isLowerCategory(batch.category, to)) return []
-  const safeUntil = safeUntilFor(to, Date.parse(batch.cookedAt), now)
+  const safeUntil = safeUntilFor(to, windowBase(batch), now)
   return [{ from: batch.category, to, at: now, safeUntil, reason: "manual" }]
 }
 

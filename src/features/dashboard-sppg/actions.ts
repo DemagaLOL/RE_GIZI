@@ -13,11 +13,10 @@ import {
 } from "@/lib/data"
 import { getSession } from "@/features/session"
 import { formatPickupCode } from "@/lib/format"
+import { COOKED_FIELD, DRY_FIELD } from "./cooked-options"
 import type { DashboardFormState, PickupFormState } from "./types"
 
 const CATEGORIES: readonly SurplusCategory[] = ["A", "B", "C", "D"]
-/** Pilihan "selesai dimasak" di form (menit lalu). */
-const COOKED_OPTIONS_MIN = [0, 30, 60, 120, 180, 240] as const
 
 /** Ambil ID SPPG dari sesi, atau `null` bila bukan SPPG. */
 async function currentSppgId(): Promise<string | null> {
@@ -79,8 +78,27 @@ export async function createBatchAction(
   const category = CATEGORIES.find((c) => c === formData.get("category"))
   if (!category) return { status: "error", message: "Pilih kategori sisa makanan." }
 
-  const cookedMin = Number(formData.get("cookedMinutesAgo"))
-  const minutesAgo = COOKED_OPTIONS_MIN.find((m) => m === cookedMin) ?? 0
+  // Jam aplikasi (bisa disimulasikan), bukan jam server, agar konsisten dengan batas aman.
+  const now = await getNow()
+  // Makanan kering hanya untuk kategori A; kategori lain selalu dianggap makanan matang.
+  const dry = category === "A" && formData.get("foodType") === "dry"
+  let timing: { cookedAt: string; bestBefore?: string }
+  if (dry) {
+    const minutesAhead = Number(formData.get("bestBeforeMinutes"))
+    if (!DRY_FIELD.options.some((o) => o.value === minutesAhead)) {
+      return { status: "error", message: "Pilih batas layak makanan kering." }
+    }
+    timing = {
+      cookedAt: new Date(now).toISOString(),
+      bestBefore: new Date(now + minutesAhead * 60_000).toISOString(),
+    }
+  } else {
+    const minutesAgo = Number(formData.get("cookedMinutesAgo"))
+    if (!COOKED_FIELD[category].options.some((o) => o.value === minutesAgo)) {
+      return { status: "error", message: "Pilih umur makanan sejak dimasak." }
+    }
+    timing = { cookedAt: new Date(now - minutesAgo * 60_000).toISOString() }
+  }
   const menu = formData.get("menu")
   const notes = formData.get("notes")
 
@@ -89,8 +107,8 @@ export async function createBatchAction(
     category,
     menu: typeof menu === "string" ? menu : "",
     quantity: Number(formData.get("quantity")),
-    // Jam aplikasi (bisa disimulasikan), bukan jam server, agar konsisten dengan batas aman.
-    cookedAt: new Date((await getNow()) - minutesAgo * 60_000).toISOString(),
+    foodType: dry ? "dry" : "cooked",
+    ...timing,
     notes: typeof notes === "string" ? notes : undefined,
   })
   if (!result.ok) return { status: "error", message: result.error }

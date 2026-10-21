@@ -51,6 +51,12 @@ export type BatchStatus =
   | "discarded"
   | "collected"
 
+/**
+ * Jenis makanan: `cooked` = makanan matang (batas aman dihitung sejak dimasak);
+ * `dry` = makanan kering seperti roti/biskuit (batas aman dari `bestBefore`, hanya kategori A).
+ */
+export type FoodType = "cooked" | "dry"
+
 /** Satu kiriman sisa makanan dari SPPG. */
 export type SurplusBatch = {
   id: string
@@ -63,10 +69,16 @@ export type SurplusBatch = {
   quantity: number
   /** Jumlah yang belum diklaim. */
   remainingQuantity: number
-  /** Waktu selesai dimasak (ISO 8601). */
+  foodType: FoodType
+  /** Waktu selesai dimasak (ISO 8601); untuk makanan kering = waktu dicatat. */
   cookedAt: string
   /** Batas aman konsumsi/pemanfaatan (ISO 8601). */
   safeUntil: string
+  /**
+   * Batas layak konsumsi makanan kering (ISO 8601), hanya untuk `foodType: "dry"`.
+   * Jendela B/C dihitung dari sini alih-alih dari `cookedAt` (lihat `degradation.ts`).
+   */
+  bestBefore?: string
   status: BatchStatus
   notes?: string
   createdAt: string
@@ -175,6 +187,10 @@ export type CreateBatchInput = {
   quantity: number
   cookedAt: string
   safeUntil?: string
+  /** Default `cooked`. `dry` hanya untuk kategori A dan wajib disertai `bestBefore`. */
+  foodType?: FoodType
+  /** Batas layak makanan kering (ISO 8601); paling lama `DRY_MAX_DAYS` hari lagi. */
+  bestBefore?: string
   notes?: string
 }
 

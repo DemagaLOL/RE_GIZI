@@ -2,6 +2,7 @@ import {
   ArrowDownCircle,
   CalendarClock,
   ChefHat,
+  Cookie,
   MapPin,
   Navigation,
   StickyNote,
@@ -91,9 +92,20 @@ export function BatchDetail({
             Petunjuk Arah
           </a>
         </InfoRow>
-        <InfoRow icon={CalendarClock} label="Selesai dimasak">
-          {formatDateTime(batch.cookedAt)}
-        </InfoRow>
+        {batch.foodType === "dry" ? (
+          <>
+            <InfoRow icon={Cookie} label="Jenis makanan">
+              Kering (roti, biskuit, dsb.)
+            </InfoRow>
+            <InfoRow icon={CalendarClock} label="Dicatat">
+              {formatDateTime(batch.cookedAt)}
+            </InfoRow>
+          </>
+        ) : (
+          <InfoRow icon={CalendarClock} label="Selesai dimasak">
+            {formatDateTime(batch.cookedAt)}
+          </InfoRow>
+        )}
         {batch.category !== "D" && (
           <InfoRow icon={CalendarClock} label="Batas aman">
             {formatDateTime(batch.safeUntil)} ({formatTimeLeft(batch.safeUntil, now)})

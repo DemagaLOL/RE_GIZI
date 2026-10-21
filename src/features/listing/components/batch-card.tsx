@@ -3,7 +3,7 @@ import { Clock, MapPin } from "lucide-react"
 import { FoodStatusBadge } from "@/components/shared/food-status-badge"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { BATCH_STATUS_LABEL, type SurplusBatchWithSppg } from "@/lib/data"
+import { BATCH_STATUS_LABEL, FOOD_TYPE_LABEL, type SurplusBatchWithSppg } from "@/lib/data"
 import { formatDistance, formatQuantity, formatTimeLeft, isNearDeadline } from "@/lib/format"
 import { cn } from "@/lib/utils"
 
@@ -19,6 +19,7 @@ export function BatchCard({ batch, now }: { batch: SurplusBatchWithSppg; now: nu
       <CardHeader>
         <div className="flex flex-wrap items-center gap-2">
           <FoodStatusBadge category={batch.category} />
+          {batch.foodType === "dry" && <Badge variant="outline">{FOOD_TYPE_LABEL.dry}</Badge>}
           {batch.status === "available" ? (
             // Batas aman tampil sejajar kategori agar keduanya paling menonjol (arah desain proposal).
             <span

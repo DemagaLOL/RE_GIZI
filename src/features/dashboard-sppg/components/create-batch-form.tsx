@@ -5,20 +5,24 @@ import { Loader2 } from "lucide-react"
 import { FoodStatusBadge } from "@/components/shared/food-status-badge"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { CATEGORY_UNIT, ELIGIBLE_RECIPIENTS, RECIPIENT_TYPE_LABEL } from "@/lib/data/constants"
-import type { SurplusCategory } from "@/lib/data/types"
+import {
+  CATEGORY_UNIT,
+  ELIGIBLE_RECIPIENTS,
+  FOOD_TYPE_LABEL,
+  RECIPIENT_TYPE_LABEL,
+} from "@/lib/data/constants"
+import type { FoodType, SurplusCategory } from "@/lib/data/types"
 import { createBatchAction } from "../actions"
+import { COOKED_FIELD, DRY_FIELD } from "../cooked-options"
 import type { DashboardFormState } from "../types"
 
 const INITIAL_STATE: DashboardFormState = { status: "idle" }
 const CATEGORIES: readonly SurplusCategory[] = ["A", "B", "C", "D"]
-const COOKED_OPTIONS: readonly { value: number; label: string }[] = [
-  { value: 0, label: "Baru saja" },
-  { value: 30, label: "30 menit lalu" },
-  { value: 60, label: "1 jam lalu" },
-  { value: 120, label: "2 jam lalu" },
-  { value: 180, label: "3 jam lalu" },
-  { value: 240, label: "4 jam lalu" },
+
+/** Pilihan jenis makanan untuk kategori A. */
+const FOOD_TYPES: readonly { value: FoodType; description: string }[] = [
+  { value: "cooked", description: "Nasi, lauk, sayur — aman 4 jam sejak dimasak" },
+  { value: "dry", description: "Roti, biskuit, dsb. — tahan beberapa hari" },
 ]
 
 const FIELD_CLASS =
@@ -35,7 +39,12 @@ function categoryHint(category: SurplusCategory): string {
 export function CreateBatchForm() {
   const [state, formAction, pending] = useActionState(createBatchAction, INITIAL_STATE)
   const [category, setCategory] = useState<SurplusCategory>("A")
+  const [foodType, setFoodType] = useState<FoodType>("cooked")
   const unit = CATEGORY_UNIT[category]
+  // Makanan kering hanya untuk kategori A; kategori lain selalu makanan matang.
+  const dry = category === "A" && foodType === "dry"
+  const time = dry ? DRY_FIELD : COOKED_FIELD[category]
+  const timeName = dry ? "bestBeforeMinutes" : "cookedMinutesAgo"
 
   return (
     <form action={formAction} className="flex flex-col gap-6">
@@ -65,6 +74,34 @@ export function CreateBatchForm() {
         <p className="text-sm text-muted-foreground">{categoryHint(category)}</p>
       </fieldset>
 
+      {category === "A" && (
+        <fieldset className="flex flex-col gap-3">
+          <legend className="mb-2 text-sm font-medium">Jenis makanan</legend>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {FOOD_TYPES.map((t) => (
+              <label
+                key={t.value}
+                className={cn(
+                  "flex min-h-11 cursor-pointer flex-col justify-center rounded-lg border p-3 transition-colors has-focus-visible:ring-3 has-focus-visible:ring-ring/50",
+                  foodType === t.value ? "border-primary bg-secondary" : "bg-card hover:bg-muted"
+                )}
+              >
+                <input
+                  type="radio"
+                  name="foodType"
+                  value={t.value}
+                  checked={foodType === t.value}
+                  onChange={() => setFoodType(t.value)}
+                  className="sr-only"
+                />
+                <span className="text-sm font-medium">{FOOD_TYPE_LABEL[t.value]}</span>
+                <span className="text-sm text-muted-foreground">{t.description}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      )}
+
       <div className="flex flex-col gap-2">
         <label htmlFor="menu" className="text-sm font-medium">
           Menu / isi
@@ -73,7 +110,7 @@ export function CreateBatchForm() {
           id="menu"
           name="menu"
           required
-          placeholder="mis. Nasi, ayam suwir kecap, tumis buncis"
+          placeholder={dry ? "mis. Roti isi cokelat, biskuit kemasan" : "mis. Nasi, ayam suwir kecap, tumis buncis"}
           className={cn(FIELD_CLASS, "h-11")}
         />
       </div>
@@ -95,16 +132,27 @@ export function CreateBatchForm() {
           />
         </div>
         <div className="flex flex-col gap-2">
-          <label htmlFor="cookedMinutesAgo" className="text-sm font-medium">
-            Selesai dimasak
+          <label htmlFor={timeName} className="text-sm font-medium">
+            {time.label}
           </label>
-          <select id="cookedMinutesAgo" name="cookedMinutesAgo" defaultValue={60} className={cn(FIELD_CLASS, "h-11")}>
-            {COOKED_OPTIONS.map((o) => (
+          {/* `key` mengembalikan pilihan ke default setiap kali kategori/jenis makanan diganti. */}
+          <select
+            key={`${category}-${dry ? "dry" : "cooked"}`}
+            id={timeName}
+            name={timeName}
+            defaultValue={time.defaultValue}
+            aria-describedby="time-hint"
+            className={cn(FIELD_CLASS, "h-11")}
+          >
+            {time.options.map((o) => (
               <option key={o.value} value={o.value}>
                 {o.label}
               </option>
             ))}
           </select>
+          <p id="time-hint" className="text-sm text-muted-foreground">
+            {time.hint}
+          </p>
         </div>
       </div>
 

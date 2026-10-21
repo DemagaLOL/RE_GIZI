@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "RE:GIZI — Selamatkan Sisa Makanan MBG",
+    default: "RE:GIZI",
     template: "%s | RE:GIZI",
   },
   description:

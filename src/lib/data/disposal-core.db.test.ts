@@ -38,6 +38,7 @@ function seedBatch(id: string, category: SurplusCategory): void {
     unit: "kg",
     quantity: 12,
     remainingQuantity: 12,
+    foodType: "cooked",
     cookedAt: iso(COOKED),
     safeUntil: iso(category === "D" ? COOKED : COOKED + 72 * HOUR),
     status: category === "D" ? "discarded" : "available",

@@ -40,13 +40,17 @@ export function fromRecipient(recipient: Recipient): RecipientRow {
 
 /** Baris `batches` → `SurplusBatch`. */
 export function toBatch(row: BatchRow): SurplusBatch {
-  const { notes, ...rest } = row
-  return notes === null ? rest : { ...rest, notes }
+  const { notes, bestBefore, ...rest } = row
+  return {
+    ...rest,
+    ...(notes !== null && { notes }),
+    ...(bestBefore !== null && { bestBefore }),
+  }
 }
 
 /** `SurplusBatch` → baris `batches`. */
 export function fromBatch(batch: SurplusBatch): BatchRow {
-  return { ...batch, notes: batch.notes ?? null }
+  return { ...batch, notes: batch.notes ?? null, bestBefore: batch.bestBefore ?? null }
 }
 
 /** Baris `claims` → `Claim`. */

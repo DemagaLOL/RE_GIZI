@@ -38,6 +38,7 @@ function seedClaimedBatch(id: string, status: Claim["status"]): Claim {
     unit: "porsi",
     quantity: 20,
     remainingQuantity: status === "cancelled" ? 20 : 0,
+    foodType: "cooked",
     cookedAt: iso(COOKED),
     safeUntil: iso(COOKED + 4 * HOUR),
     status: status === "picked_up" ? "completed" : status === "pending" ? "reserved" : "available",

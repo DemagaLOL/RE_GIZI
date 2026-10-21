@@ -38,6 +38,7 @@ function seedBatch(id: string, claims: readonly { status: Claim["status"]; quant
     unit: "porsi",
     quantity: 50,
     remainingQuantity: 50 - claimed,
+    foodType: "cooked",
     cookedAt: iso(COOKED),
     safeUntil: iso(COOKED + 4 * HOUR),
     status: claimed === 50 ? "reserved" : "available",

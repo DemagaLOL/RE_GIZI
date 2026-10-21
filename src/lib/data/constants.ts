@@ -2,6 +2,7 @@ import type {
   BatchStatus,
   ClaimStatus,
   DegradationReason,
+  FoodType,
   GeoPoint,
   QuantityUnit,
   RecipientType,
@@ -65,6 +66,18 @@ export const SAFE_WINDOW_HOURS: Record<SurplusCategory, number> = {
   B: 24,
   C: 72,
   D: 0,
+}
+
+/**
+ * Batas layak terpanjang (hari) untuk makanan kering kategori A (roti, biskuit, dsb.).
+ * Dibatasi agar sisa tetap cepat disalurkan meski kemasannya tahan lebih lama.
+ */
+export const DRY_MAX_DAYS = 7
+
+/** Label jenis makanan untuk UI. */
+export const FOOD_TYPE_LABEL: Record<FoodType, string> = {
+  cooked: "Makanan matang",
+  dry: "Makanan kering",
 }
 
 /** Urutan kondisi dari terbaik ke terburuk; kategori hanya bisa turun mengikuti urutan ini. */
