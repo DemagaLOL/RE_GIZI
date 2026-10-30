@@ -4,8 +4,8 @@ import { simNow } from "./clock"
 import { getDb, type Db } from "./db/client"
 import { toBatch, toDisposal, toSppg, toTps } from "./db/mappers"
 import * as schema from "./db/schema"
-import { applyDueDegradations, degradeDueBatches } from "./degradation"
-import { applyCollection } from "./disposal-core"
+import { applyCollection, selectDisposalsBySppg } from "./disposal-core"
+import { applyDueChanges, syncDueChanges } from "./due-changes"
 import { distanceKm } from "./geo"
 import type {
   CollectDisposalInput,
@@ -13,12 +13,13 @@ import type {
   Disposal,
   DisposalSummary,
   DisposalWithBatch,
+  DisposalWithTps,
   SurplusBatchWithSppg,
 } from "./types"
 
-/** Turunkan batch yang jatuh tempo agar batch yang baru menjadi D ikut terlihat. */
+/** Terapkan perubahan yang jatuh tempo agar batch yang baru menjadi D ikut terlihat. */
 function syncBatches(db: Db): void {
-  degradeDueBatches(db, simNow(db))
+  syncDueChanges(db, simNow(db))
 }
 
 /**
@@ -57,7 +58,7 @@ export async function collectDisposal(input: CollectDisposalInput): Promise<Data
   return getDb().transaction(
     (tx): DataResult<Disposal> => {
       const now = simNow(tx)
-      applyDueDegradations(tx, now)
+      applyDueChanges(tx, now)
       return applyCollection(tx, input, now)
     },
     { behavior: "immediate" }
@@ -79,6 +80,15 @@ export async function getDisposalsByTps(tpsId: string): Promise<DisposalWithBatc
       ...toDisposal(r.disposal),
       batch: { ...toBatch(r.batch), sppg: toSppg(r.sppg) },
     }))
+}
+
+/**
+ * Riwayat pengangkutan sisa kategori D milik satu SPPG, terbaru dulu. Hanya untuk SPPG
+ * pemiliknya — jangan tampilkan ke peran lain.
+ */
+export async function getDisposalsBySppg(sppgId: string): Promise<DisposalWithTps[]> {
+  await io()
+  return selectDisposalsBySppg(getDb(), sppgId)
 }
 
 /**

@@ -6,6 +6,7 @@ import type {
   GeoPoint,
   QuantityUnit,
   RecipientType,
+  ReportEventKind,
   Regency,
   SurplusCategory,
 } from "./types"
@@ -79,6 +80,48 @@ export const SAFE_WINDOW_HOURS: Record<SurplusCategory, number> = {
  */
 export const DRY_MAX_DAYS = 7
 
+/**
+ * Lama klaim boleh menunggu diambil (jam) sebelum batal otomatis, agar penerima yang tidak
+ * datang tidak menahan stok. Tetap dibatasi batas aman batch. D tidak bisa diklaim (0).
+ */
+export const PICKUP_WINDOW_HOURS: Record<SurplusCategory, number> = {
+  A: 1,
+  B: 6,
+  C: 24,
+  D: 0,
+}
+
+/** Tenggat ambil makanan kering kategori A (jam); lebih longgar karena tahan lebih lama. */
+export const DRY_PICKUP_WINDOW_HOURS = 24
+
+/**
+ * Bagian kategori A yang boleh diambil satu penerima per batch, agar makanan layak
+ * konsumsi terbagi ke beberapa penerima. B/C boleh diambil seluruhnya: satu peternak yang
+ * menghabiskan batch justru mengurangi sisa terbuang.
+ */
+export const CLAIM_SHARE_LIMIT = 0.5
+
+/** Batas bawah jatah kategori A (porsi), agar batch kecil tetap bisa diambil seluruhnya. */
+export const CLAIM_MIN_PORTIONS = 10
+
+/** Jumlah klaim `pending` terbanyak yang boleh dimiliki satu penerima sekaligus. */
+export const MAX_ACTIVE_CLAIMS = 5
+
+/** Panjang maksimal alasan penarikan batch. */
+export const WITHDRAW_REASON_MAX_LENGTH = 200
+
+/** Periode laporan bawaan (hari). */
+export const DEFAULT_REPORT_DAYS = 30
+
+/** Periode laporan terpanjang (hari), cukup untuk satu bulan penuh. */
+export const MAX_REPORT_DAYS = 31
+
+/** Rentang grafik tren di dasbor (hari). */
+export const DASHBOARD_TREND_DAYS = 14
+
+/** Jumlah hari riwayat contoh di panel demo, sama dengan rentang grafik dasbor. */
+export const DEMO_HISTORY_DAYS = DASHBOARD_TREND_DAYS
+
 /** Label jenis makanan untuk UI. */
 export const FOOD_TYPE_LABEL: Record<FoodType, string> = {
   cooked: "Makanan matang",
@@ -128,6 +171,14 @@ export const BATCH_STATUS_LABEL: Record<BatchStatus, string> = {
   expired: "Kedaluwarsa",
   discarded: "Menunggu Diangkut",
   collected: "Sudah Diangkut",
+  withdrawn: "Ditarik SPPG",
+}
+
+export const REPORT_EVENT_LABEL: Record<ReportEventKind, string> = {
+  registered: "Dicatat",
+  degraded: "Turun Kategori",
+  distributed: "Tersalurkan",
+  collected: "Diangkut TPS",
 }
 
 export const CLAIM_STATUS_LABEL: Record<ClaimStatus, string> = {

@@ -16,7 +16,7 @@ export async function SimClockBanner() {
   if (!clock.simulated) return null
 
   return (
-    <div role="status" className="border-b bg-warning text-warning-foreground">
+    <div role="status" className="border-b bg-warning text-warning-foreground print:hidden">
       <Container className="flex min-h-10 flex-wrap items-center gap-x-2 gap-y-1 py-1.5 text-sm">
         <Timer className="size-4 shrink-0" aria-hidden />
         <span className="font-medium">Waktu simulasi</span>

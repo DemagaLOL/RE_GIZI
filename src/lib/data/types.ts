@@ -42,6 +42,8 @@ export type QuantityUnit = "porsi" | "kg"
  *   kategori alih-alih kedaluwarsa)
  * - `discarded` — kategori D, menunggu diangkut TPS (tidak bisa diklaim penerima)
  * - `collected` — kategori D yang sudah diangkut TPS (lihat `Disposal`)
+ * - `withdrawn` — ditarik SPPG (mis. salah catat); dianggap tidak pernah ada, jadi tidak tampil
+ *   di daftar dan angka mana pun. Barisnya disimpan hanya sebagai jejak audit
  */
 export type BatchStatus =
   | "available"
@@ -50,6 +52,7 @@ export type BatchStatus =
   | "expired"
   | "discarded"
   | "collected"
+  | "withdrawn"
 
 /**
  * Jenis makanan: `cooked` = makanan matang (batas aman dihitung sejak dimasak);
@@ -82,6 +85,10 @@ export type SurplusBatch = {
   status: BatchStatus
   notes?: string
   createdAt: string
+  /** Waktu ditarik SPPG (ISO 8601), hanya untuk `status: "withdrawn"`. */
+  withdrawnAt?: string
+  /** Alasan penarikan, hanya untuk `status: "withdrawn"`. */
+  withdrawReason?: string
 }
 
 /** Batch beserta data SPPG asalnya (hasil join). */
@@ -109,9 +116,10 @@ export type ClaimStatus = "pending" | "picked_up" | "cancelled"
 
 /**
  * Penyebab klaim dibatalkan: `degraded` = batch turun kategori sebelum diambil,
- * `recipient` = dibatalkan sendiri oleh penerima.
+ * `recipient` = dibatalkan sendiri oleh penerima, `sppg` = dibatalkan petugas SPPG,
+ * `expired` = melewati tenggat ambil, `withdrawn` = batch ditarik SPPG.
  */
-export type ClaimCancelReason = "degraded" | "recipient"
+export type ClaimCancelReason = "degraded" | "recipient" | "sppg" | "expired" | "withdrawn"
 
 /** Klaim penerima atas sebagian/seluruh batch. */
 export type Claim = {
@@ -130,6 +138,8 @@ export type Claim = {
   /** Kode yang ditunjukkan ke petugas SPPG saat pengambilan. */
   pickupCode: string
   claimedAt: string
+  /** Lewat waktu ini klaim `pending` batal otomatis; kosong pada data lama (ikut `safeUntil` batch). */
+  pickupDeadline?: string
   pickedUpAt?: string
   /** Hanya untuk klaim `cancelled`; kosong pada data lama. */
   cancelReason?: ClaimCancelReason
@@ -208,6 +218,32 @@ export type ClaimBatchInput = {
 export type CancelClaimInput = {
   claimId: string
   recipientId: string
+}
+
+/** Input `cancelClaimBySppg`: petugas SPPG membatalkan klaim `pending` pada batch miliknya. */
+export type CancelClaimBySppgInput = {
+  claimId: string
+  sppgId: string
+}
+
+/**
+ * Input `updateBatch`. Waktu masak dan kategori sengaja tidak bisa diubah agar batas
+ * aman tidak bisa dimundurkan; kategori hanya turun lewat `degradeBatch`.
+ */
+export type UpdateBatchInput = {
+  sppgId: string
+  batchId: string
+  menu: string
+  /** Jumlah total baru; tidak boleh kurang dari yang sudah diklaim. */
+  quantity: number
+  notes?: string
+}
+
+/** Input `withdrawBatch`: SPPG menarik batch dengan alasan tertulis. */
+export type WithdrawBatchInput = {
+  sppgId: string
+  batchId: string
+  reason: string
 }
 
 /** Pemicu turunnya kategori: `auto` = lewat batas aman, `manual` = diturunkan SPPG. */
@@ -340,6 +376,9 @@ export type Disposal = {
 /** Pengangkutan beserta batch & SPPG asalnya (hasil join). */
 export type DisposalWithBatch = Disposal & { batch: SurplusBatchWithSppg }
 
+/** Pengangkutan beserta nama TPS & menu batch, untuk riwayat di dasbor SPPG. */
+export type DisposalWithTps = Disposal & { tpsName: string; menu: string }
+
 /** Input `collectDisposal`: TPS menandai batch D sudah diangkut. */
 export type CollectDisposalInput = {
   tpsId: string
@@ -358,6 +397,68 @@ export type DisposalSummary = {
   /** Total kg yang sudah diangkut TPS. */
   collectedKg: number
   collectedBatches: number
+}
+
+/** Periode laporan: tanggal `YYYY-MM-DD` di WIB, kedua ujung ikut dihitung. */
+export type ReportPeriod = { from: string; to: string }
+
+/**
+ * Jenis kejadian di laporan SPPG: `registered` = dicatat, `degraded` = turun kategori,
+ * `distributed` = diserahkan ke penerima, `collected` = diangkut TPS.
+ */
+export type ReportEventKind = "registered" | "degraded" | "distributed" | "collected"
+
+/** Satu baris laporan. Batch yang ditarik SPPG tidak pernah muncul di sini. */
+export type ReportEvent = {
+  /** Waktu kejadian (ISO 8601). */
+  at: string
+  kind: ReportEventKind
+  category: SurplusCategory
+  menu: string
+  quantity: number
+  unit: QuantityUnit
+  /** Berat setara dalam kg; porsi dikonversi memakai `KG_PER_PORTION`. */
+  kg: number
+  /** Penerima atau TPS, bila ada. */
+  party?: string
+  note?: string
+}
+
+/** Rekap satu hari (WIB) untuk grafik tren. */
+export type DailyTrendPoint = {
+  /** Tanggal `YYYY-MM-DD` di WIB. */
+  date: string
+  /** Porsi kategori A yang tersalurkan. */
+  portionsA: number
+  kgA: number
+  kgB: number
+  kgC: number
+  /** Total tersalurkan (A + B + C), dalam kg. */
+  totalKg: number
+  /** Kategori D yang diangkut TPS, dalam kg. */
+  collectedKg: number
+}
+
+/** Ringkasan satu periode laporan. */
+export type ReportTotals = {
+  registeredBatches: number
+  portionsA: number
+  kgB: number
+  kgC: number
+  /** Total tersalurkan (A + B + C), dalam kg. */
+  distributedKg: number
+  collectedKg: number
+}
+
+/** Laporan sisa pangan satu SPPG untuk satu periode. */
+export type SppgReport = {
+  period: ReportPeriod
+  /** Waktu laporan dibuat (ISO 8601), menurut jam aplikasi. */
+  generatedAt: string
+  trend: DailyTrendPoint[]
+  totals: ReportTotals
+  /** Seluruh kejadian pada periode, terlama dulu. */
+  events: ReportEvent[]
 }
 
 /** Hasil operasi tulis: sukses dengan data, atau gagal dengan pesan berbahasa Indonesia. */

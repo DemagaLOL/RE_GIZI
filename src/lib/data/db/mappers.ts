@@ -40,24 +40,33 @@ export function fromRecipient(recipient: Recipient): RecipientRow {
 
 /** Baris `batches` → `SurplusBatch`. */
 export function toBatch(row: BatchRow): SurplusBatch {
-  const { notes, bestBefore, ...rest } = row
+  const { notes, bestBefore, withdrawnAt, withdrawReason, ...rest } = row
   return {
     ...rest,
     ...(notes !== null && { notes }),
     ...(bestBefore !== null && { bestBefore }),
+    ...(withdrawnAt !== null && { withdrawnAt }),
+    ...(withdrawReason !== null && { withdrawReason }),
   }
 }
 
 /** `SurplusBatch` → baris `batches`. */
 export function fromBatch(batch: SurplusBatch): BatchRow {
-  return { ...batch, notes: batch.notes ?? null, bestBefore: batch.bestBefore ?? null }
+  return {
+    ...batch,
+    notes: batch.notes ?? null,
+    bestBefore: batch.bestBefore ?? null,
+    withdrawnAt: batch.withdrawnAt ?? null,
+    withdrawReason: batch.withdrawReason ?? null,
+  }
 }
 
 /** Baris `claims` → `Claim`. */
 export function toClaim(row: ClaimRow): Claim {
-  const { pickedUpAt, cancelReason, ...rest } = row
+  const { pickupDeadline, pickedUpAt, cancelReason, ...rest } = row
   return {
     ...rest,
+    ...(pickupDeadline !== null && { pickupDeadline }),
     ...(pickedUpAt !== null && { pickedUpAt }),
     ...(cancelReason !== null && { cancelReason }),
   }
@@ -67,6 +76,7 @@ export function toClaim(row: ClaimRow): Claim {
 export function fromClaim(claim: Claim): ClaimRow {
   return {
     ...claim,
+    pickupDeadline: claim.pickupDeadline ?? null,
     pickedUpAt: claim.pickedUpAt ?? null,
     cancelReason: claim.cancelReason ?? null,
   }

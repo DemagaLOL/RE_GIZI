@@ -9,6 +9,19 @@ const dateTimeFormat = new Intl.DateTimeFormat("id-ID", {
   timeZone: "Asia/Jakarta",
 })
 
+/** Tanggal `YYYY-MM-DD` sudah berupa hari WIB; diformat sebagai UTC agar harinya tidak bergeser. */
+const shortDateFormat = new Intl.DateTimeFormat("id-ID", {
+  day: "numeric",
+  month: "short",
+  timeZone: "UTC",
+})
+const longDateFormat = new Intl.DateTimeFormat("id-ID", {
+  day: "numeric",
+  month: "long",
+  year: "numeric",
+  timeZone: "UTC",
+})
+
 const clockFormat = new Intl.DateTimeFormat("id-ID", {
   weekday: "short",
   day: "numeric",
@@ -38,6 +51,16 @@ export function formatDistance(km: number): string {
 /** Format tanggal & jam WIB, mis. `14 Okt 13.30`. */
 export function formatDateTime(iso: string): string {
   return dateTimeFormat.format(new Date(iso))
+}
+
+/** Format tanggal `YYYY-MM-DD` ringkas, mis. `14 Okt`. */
+export function formatShortDate(date: string): string {
+  return shortDateFormat.format(new Date(`${date}T00:00:00Z`))
+}
+
+/** Format tanggal `YYYY-MM-DD` lengkap, mis. `14 Oktober 2026`. */
+export function formatLongDate(date: string): string {
+  return longDateFormat.format(new Date(`${date}T00:00:00Z`))
 }
 
 /** Format jam lengkap dengan detik (WIB), mis. `Jum, 16 Okt 14.32.05`. */

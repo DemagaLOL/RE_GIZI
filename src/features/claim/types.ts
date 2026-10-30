@@ -1,11 +1,11 @@
 /**
  * State form klaim untuk `useActionState`. Saat galat, jumlah yang diisi dikembalikan
- * (`quantity`) karena React mengosongkan form setelah action selesai.
+ * (`quantity`) karena React mengosongkan form setelah action selesai. Sukses selalu
+ * diarahkan ke `/klaim-saya` (redirect), tempat kode ambil ditampilkan.
  */
 export type ClaimFormState =
   | { status: "idle" }
   | { status: "error"; message: string; quantity?: string }
-  | { status: "success"; pickupCode: string; quantity: number }
 
 /**
  * State tombol batalkan klaim. Tidak ada state sukses: setelah berhasil halaman

@@ -18,7 +18,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <SimClockBanner />
       </Suspense>
       {/* Ruang bawah agar konten tidak tertutup tab bar mobile (h-14 + safe area). */}
-      <main className="flex flex-1 flex-col pb-[calc(3.5rem+env(safe-area-inset-bottom))] md:pb-0">
+      <main className="flex flex-1 flex-col pb-[calc(3.5rem+env(safe-area-inset-bottom))] md:pb-0 print:pb-0">
         {children}
       </main>
     </>

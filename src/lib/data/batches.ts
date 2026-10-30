@@ -1,22 +1,21 @@
 import { and, asc, count, desc, eq, inArray, ne, type SQL } from "drizzle-orm"
 import { io } from "next/cache"
-import { randomInt } from "node:crypto"
-import { applyClaimCancellation } from "./claim-cancel"
+import { applyBatchUpdate, applyBatchWithdrawal, parseBatchText } from "./batch-edit"
+import { refreshBatchStatus } from "./batch-status"
+import { applyClaimCancellation, applySppgClaimCancellation } from "./claim-cancel"
+import { applyClaim, recipientAllowance } from "./claim-core"
 import { simNow } from "./clock"
 import {
   CATEGORY_LABEL,
   CATEGORY_UNIT,
   DRY_MAX_DAYS,
   ELIGIBLE_RECIPIENTS,
-  MENU_MAX_LENGTH,
-  NOTES_MAX_LENGTH,
   PICKUP_CODE_LENGTH,
   SAFE_WINDOW_HOURS,
 } from "./constants"
 import { getDb, type Db, type Tx } from "./db/client"
 import {
   fromBatch,
-  fromClaim,
   toBatch,
   toCategoryEvent,
   toClaim,
@@ -24,23 +23,19 @@ import {
   toSppg,
 } from "./db/mappers"
 import * as schema from "./db/schema"
-import {
-  applyDegradation,
-  applyDueDegradations,
-  degradeDueBatches,
-  planManualDegradation,
-} from "./degradation"
-import { formatQuantity } from "../format"
+import { applyDegradation, planManualDegradation } from "./degradation"
+import { applyDueChanges, syncDueChanges } from "./due-changes"
 import { distanceKm } from "./geo"
 import { roundQuantity, validateQuantity } from "./quantity"
-import { deriveBatchStatus } from "./seed"
 import type {
   BatchFilter,
   BatchStatus,
+  CancelClaimBySppgInput,
   CancelClaimInput,
   CategoryEvent,
   Claim,
   ClaimBatchInput,
+  ClaimCancelReason,
   ClaimWithBatch,
   ClaimWithRecipient,
   ConfirmPickupInput,
@@ -52,6 +47,8 @@ import type {
   SurplusBatch,
   SurplusBatchWithSppg,
   SurplusCategory,
+  UpdateBatchInput,
+  WithdrawBatchInput,
 } from "./types"
 
 const HOUR = 60 * 60 * 1000
@@ -66,27 +63,16 @@ const STATUS_ORDER: Record<BatchStatus, number> = {
   expired: 3,
   discarded: 4,
   collected: 5,
+  withdrawn: 6,
 }
 
 const CATEGORIES = Object.keys(ELIGIBLE_RECIPIENTS) as SurplusCategory[]
 
-/** Waktu aplikasi saat ini (bisa disimulasikan) lalu turunkan batch yang jatuh tempo. */
+/** Waktu aplikasi saat ini (bisa disimulasikan) lalu terapkan perubahan yang jatuh tempo. */
 function syncBatches(db: Db): number {
   const now = simNow(db)
-  degradeDueBatches(db, now)
+  syncDueChanges(db, now)
   return now
-}
-
-/** Hitung ulang status batch dari sisa & seluruh klaimnya. Batch D tetap `discarded`. */
-function refreshBatchStatus(tx: Tx, batch: SurplusBatch, now: number): void {
-  if (batch.status === "discarded") return
-  const claims = tx
-    .select({ status: schema.claims.status })
-    .from(schema.claims)
-    .where(eq(schema.claims.batchId, batch.id))
-    .all()
-  const status = deriveBatchStatus(batch.remainingQuantity, claims, batch.safeUntil, now)
-  tx.update(schema.batches).set({ status }).where(eq(schema.batches.id, batch.id)).run()
 }
 
 function sortBatches<T extends SurplusBatch>(list: T[]): T[] {
@@ -109,14 +95,15 @@ export async function getNow(): Promise<number> {
 /**
  * Daftar batch beserta SPPG-nya. Urutan: status (tersedia dulu), lalu batas aman
  * paling dekat — atau jarak terdekat bila `sort: "distance"` dengan `near`.
- * Batch yang lewat batas aman otomatis turun kategori (A→B→C→D).
+ * Batch yang lewat batas aman otomatis turun kategori (A→B→C→D). Batch yang ditarik SPPG
+ * tidak pernah ikut: bagi seluruh aplikasi batch itu dianggap tidak pernah ada.
  */
 export async function getBatches(filter: BatchFilter = {}): Promise<SurplusBatchWithSppg[]> {
   await io()
   const db = getDb()
   syncBatches(db)
 
-  const conditions: SQL[] = []
+  const conditions: SQL[] = [ne(schema.batches.status, "withdrawn")]
   if (filter.category) conditions.push(eq(schema.batches.category, filter.category))
   if (filter.status) conditions.push(eq(schema.batches.status, filter.status))
   if (filter.sppgId) conditions.push(eq(schema.batches.sppgId, filter.sppgId))
@@ -155,7 +142,7 @@ export async function getBatches(filter: BatchFilter = {}): Promise<SurplusBatch
   return sortBatches(list)
 }
 
-/** Satu batch beserta SPPG-nya, atau `null` bila tidak ada. */
+/** Satu batch beserta SPPG-nya, atau `null` bila tidak ada atau sudah ditarik SPPG. */
 export async function getBatchById(id: string): Promise<SurplusBatchWithSppg | null> {
   await io()
   const db = getDb()
@@ -164,7 +151,7 @@ export async function getBatchById(id: string): Promise<SurplusBatchWithSppg | n
     .select({ batch: schema.batches, sppg: schema.sppg })
     .from(schema.batches)
     .innerJoin(schema.sppg, eq(schema.batches.sppgId, schema.sppg.id))
-    .where(eq(schema.batches.id, id))
+    .where(and(eq(schema.batches.id, id), ne(schema.batches.status, "withdrawn")))
     .get()
   return row ? { ...toBatch(row.batch), sppg: toSppg(row.sppg) } : null
 }
@@ -231,6 +218,13 @@ export async function getClaimsByRecipient(recipientId: string): Promise<ClaimWi
     .sort((a, b) => Date.parse(b.claimedAt) - Date.parse(a.claimedAt))
 }
 
+/** Pesan saat kode ambil klaim yang dibatalkan dimasukkan petugas SPPG. */
+const CANCELLED_PICKUP_ERROR: Partial<Record<ClaimCancelReason, string>> = {
+  expired: "Klaim batal karena melewati tenggat ambil.",
+  sppg: "Klaim ini sudah dibatalkan petugas SPPG.",
+  withdrawn: "Klaim batal karena sisa ini sudah ditarik SPPG.",
+}
+
 /**
  * Cari klaim `pending` berdasarkan kode ambil pada batch milik SPPG tertentu.
  * Selain angka diabaikan, jadi `"048 213"` dan `"048-213"` sama dengan `"048213"`.
@@ -254,7 +248,9 @@ function findPendingPickup(
   }
   if (row.claim.status === "picked_up") return { ok: false, error: "Klaim ini sudah diambil." }
   if (row.claim.status === "cancelled") {
-    // Pembatalan klaim terjadi saat batch turun kategori (lewat batas aman / diturunkan SPPG).
+    const reasonError = row.claim.cancelReason && CANCELLED_PICKUP_ERROR[row.claim.cancelReason]
+    if (reasonError) return { ok: false, error: reasonError }
+    // Selain itu, klaim batal karena batch turun kategori atau dibatalkan penerima.
     return row.claim.category !== row.batch.category
       ? {
           ok: false,
@@ -305,7 +301,7 @@ export async function confirmPickup(input: ConfirmPickupInput): Promise<DataResu
   return getDb().transaction(
     (tx): DataResult<Claim> => {
       const now = simNow(tx)
-      applyDueDegradations(tx, now)
+      applyDueChanges(tx, now)
       const found = findPendingPickup(tx, input)
       if (!found.ok) return found
       const { claim, batch } = found.data
@@ -353,7 +349,7 @@ export async function getImpactStats(filter: { sppgId?: string } = {}): Promise<
     .where(bySppg)
     .all()
   for (const batch of batches) {
-    if (batch.category === "D") stats.discardedKg += batch.quantity
+    if (batch.category === "D" && batch.status !== "withdrawn") stats.discardedKg += batch.quantity
     if (batch.status === "available") stats.availableBatches += 1
   }
 
@@ -398,15 +394,9 @@ export async function createBatch(input: CreateBatchInput): Promise<DataResult<S
     .where(eq(schema.sppg.id, input.sppgId))
     .get()
   if (!sppg) return { ok: false, error: "SPPG tidak ditemukan." }
-  const menu = input.menu.trim()
-  if (!menu) return { ok: false, error: "Menu/isi tidak boleh kosong." }
-  if (menu.length > MENU_MAX_LENGTH) {
-    return { ok: false, error: `Menu/isi paling banyak ${MENU_MAX_LENGTH} karakter.` }
-  }
-  const notes = input.notes?.trim() || undefined
-  if (notes && notes.length > NOTES_MAX_LENGTH) {
-    return { ok: false, error: `Catatan paling banyak ${NOTES_MAX_LENGTH} karakter.` }
-  }
+  const text = parseBatchText(input)
+  if (!text.ok) return text
+  const { menu, notes } = text.data
 
   const unit = CATEGORY_UNIT[input.category]
   const quantityError = validateQuantity(input.quantity, unit)
@@ -470,28 +460,9 @@ export async function createBatch(input: CreateBatchInput): Promise<DataResult<S
   return { ok: true, data: batch }
 }
 
-/** Kode ambil acak berupa angka saja (`PICKUP_CODE_LENGTH` digit, nol di depan dipertahankan). */
-function generatePickupCode(): string {
-  return String(randomInt(0, 10 ** PICKUP_CODE_LENGTH)).padStart(PICKUP_CODE_LENGTH, "0")
-}
-
-/** Kode ambil yang belum dipakai klaim lain (kode bersifat unik di tabel). */
-function uniquePickupCode(tx: Tx): string {
-  for (;;) {
-    const code = generatePickupCode()
-    const taken = tx
-      .select({ id: schema.claims.id })
-      .from(schema.claims)
-      .where(eq(schema.claims.pickupCode, code))
-      .get()
-    if (!taken) return code
-  }
-}
-
 /**
- * Penerima mengklaim sebagian/seluruh batch. Menolak bila jenis penerima tidak
- * sesuai kategori, batch tidak tersedia/lewat batas aman, atau jumlah melebihi sisa.
- * Berjalan dalam satu transaksi `IMMEDIATE` agar aman dari klaim ganda.
+ * Penerima mengklaim sebagian/seluruh batch (aturan lengkap di `applyClaim`). Berjalan
+ * dalam satu transaksi `IMMEDIATE` agar aman dari klaim ganda.
  */
 export async function claimBatch(input: ClaimBatchInput): Promise<DataResult<Claim>> {
   await io()
@@ -499,74 +470,24 @@ export async function claimBatch(input: ClaimBatchInput): Promise<DataResult<Cla
   return getDb().transaction(
     (tx): DataResult<Claim> => {
       const now = simNow(tx)
-      applyDueDegradations(tx, now)
-
-      const batchRow = tx
-        .select()
-        .from(schema.batches)
-        .where(eq(schema.batches.id, input.batchId))
-        .get()
-      if (!batchRow) return { ok: false, error: "Batch tidak ditemukan." }
-      const recipient = tx
-        .select({ id: schema.recipients.id, type: schema.recipients.type })
-        .from(schema.recipients)
-        .where(eq(schema.recipients.id, input.recipientId))
-        .get()
-      if (!recipient) return { ok: false, error: "Penerima tidak ditemukan." }
-
-      const batch = toBatch(batchRow)
-      if (batch.status === "discarded") {
-        return { ok: false, error: "Sisa kategori D tidak layak dan tidak dapat diklaim." }
-      }
-      if (!ELIGIBLE_RECIPIENTS[batch.category].includes(recipient.type)) {
-        return {
-          ok: false,
-          error: `Sisa ini berkategori ${batch.category} (${CATEGORY_LABEL[batch.category]}) dan tidak dapat diklaim jenis penerima Anda.`,
-        }
-      }
-      if (batch.status === "expired") {
-        return { ok: false, error: "Batch sudah melewati batas aman." }
-      }
-      if (batch.status !== "available") {
-        return { ok: false, error: "Batch sudah habis diklaim." }
-      }
-
-      const quantityError = validateQuantity(input.quantity, batch.unit)
-      if (quantityError) return { ok: false, error: quantityError }
-      // Sisa dibulatkan dulu: data lama bisa tersimpan dengan ekor floating point (0,0999… kg).
-      const available = roundQuantity(batch.remainingQuantity, batch.unit)
-      if (input.quantity > available) {
-        return {
-          ok: false,
-          error: `Jumlah melebihi sisa (${formatQuantity(available, batch.unit)}).`,
-        }
-      }
-
-      const claim: Claim = {
-        id: crypto.randomUUID(),
-        batchId: batch.id,
-        recipientId: recipient.id,
-        category: batch.category,
-        unit: batch.unit,
-        quantity: input.quantity,
-        status: "pending",
-        pickupCode: uniquePickupCode(tx),
-        claimedAt: new Date(now).toISOString(),
-      }
-      tx.insert(schema.claims).values(fromClaim(claim)).run()
-
-      // `Math.max`: hindari -0 / sisa negatif dari ekor floating point data lama.
-      const remainingQuantity = Math.max(0, roundQuantity(available - input.quantity, batch.unit))
-      tx.update(schema.batches)
-        .set({ remainingQuantity })
-        .where(eq(schema.batches.id, batch.id))
-        .run()
-      refreshBatchStatus(tx, { ...batch, remainingQuantity }, now)
-
-      return { ok: true, data: claim }
+      applyDueChanges(tx, now)
+      return applyClaim(tx, input, now)
     },
     { behavior: "immediate" }
   )
+}
+
+/**
+ * Jatah klaim penerima untuk `batch`, untuk menampilkan batas di form klaim. `claimBatch`
+ * tetap memeriksanya ulang saat klaim dikirim.
+ * @returns Jumlah terbanyak yang masih boleh diklaim, atau alasan penolakan.
+ */
+export async function getClaimAllowance(
+  batch: SurplusBatch,
+  recipientId: string
+): Promise<DataResult<number>> {
+  await io()
+  return recipientAllowance(getDb(), batch, recipientId)
 }
 
 /**
@@ -580,8 +501,60 @@ export async function cancelClaim(input: CancelClaimInput): Promise<DataResult<C
   return getDb().transaction(
     (tx): DataResult<Claim> => {
       const now = simNow(tx)
-      applyDueDegradations(tx, now)
+      applyDueChanges(tx, now)
       return applyClaimCancellation(tx, input, now)
+    },
+    { behavior: "immediate" }
+  )
+}
+
+/**
+ * Petugas SPPG membatalkan klaim `pending` pada batch miliknya (mis. penerima tidak
+ * datang); jumlahnya kembali ke sisa batch dan kode ambil tidak berlaku lagi.
+ */
+export async function cancelClaimBySppg(input: CancelClaimBySppgInput): Promise<DataResult<Claim>> {
+  await io()
+
+  return getDb().transaction(
+    (tx): DataResult<Claim> => {
+      const now = simNow(tx)
+      applyDueChanges(tx, now)
+      return applySppgClaimCancellation(tx, input, now)
+    },
+    { behavior: "immediate" }
+  )
+}
+
+/**
+ * SPPG mengubah menu, catatan, dan jumlah batch miliknya. Waktu masak dan kategori tidak
+ * bisa diubah (lihat `UpdateBatchInput`).
+ * @returns Batch setelah diubah.
+ */
+export async function updateBatch(input: UpdateBatchInput): Promise<DataResult<SurplusBatch>> {
+  await io()
+
+  return getDb().transaction(
+    (tx): DataResult<SurplusBatch> => {
+      const now = simNow(tx)
+      applyDueChanges(tx, now)
+      return applyBatchUpdate(tx, input, now)
+    },
+    { behavior: "immediate" }
+  )
+}
+
+/**
+ * SPPG menarik batch miliknya dengan alasan tertulis; klaim `pending` dibatalkan.
+ * @returns Batch setelah ditarik.
+ */
+export async function withdrawBatch(input: WithdrawBatchInput): Promise<DataResult<SurplusBatch>> {
+  await io()
+
+  return getDb().transaction(
+    (tx): DataResult<SurplusBatch> => {
+      const now = simNow(tx)
+      applyDueChanges(tx, now)
+      return applyBatchWithdrawal(tx, input, now)
     },
     { behavior: "immediate" }
   )
@@ -593,6 +566,7 @@ const NOT_DEGRADABLE_ERROR: Partial<Record<BatchStatus, string>> = {
   discarded: "Batch ini sudah kategori D (dibuang).",
   collected: "Batch ini sudah diangkut TPS.",
   expired: "Batch ini sudah melewati batas aman.",
+  withdrawn: "Batch ini sudah ditarik.",
 }
 
 /**
@@ -607,7 +581,7 @@ export async function degradeBatch(input: DegradeBatchInput): Promise<DataResult
   return getDb().transaction(
     (tx): DataResult<SurplusBatch> => {
       const now = simNow(tx)
-      applyDueDegradations(tx, now)
+      applyDueChanges(tx, now)
 
       const row = tx.select().from(schema.batches).where(eq(schema.batches.id, input.batchId)).get()
       if (!row || row.sppgId !== input.sppgId) {

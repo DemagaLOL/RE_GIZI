@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ImpactSummary, PickupConfirmForm, SppgBatches } from "@/features/dashboard-sppg"
-import { DisposalSummary } from "@/features/disposal"
+import { DisposalSummary, SppgDisposalHistory } from "@/features/disposal"
+import { DashboardTrend } from "@/features/report"
 import { requireSppgSession } from "@/features/session"
 
 export const metadata: Metadata = {
@@ -62,6 +63,17 @@ async function Dashboard({ searchParams }: { searchParams: PageProps<"/dasbor">[
         <h2 className="text-xl font-semibold">Sisa Makanan Anda</h2>
         <Suspense fallback={<Skeleton className="h-64 w-full rounded-xl" />}>
           <SppgBatches sppgId={sppg.id} />
+        </Suspense>
+      </section>
+
+      <Suspense fallback={<Skeleton className="h-72 w-full rounded-xl" />}>
+        <DashboardTrend sppgId={sppg.id} />
+      </Suspense>
+
+      <section className="flex flex-col gap-4">
+        <h2 className="text-xl font-semibold">Riwayat Pengangkutan TPS</h2>
+        <Suspense fallback={<Skeleton className="h-40 w-full rounded-xl" />}>
+          <SppgDisposalHistory sppgId={sppg.id} />
         </Suspense>
       </section>
     </>

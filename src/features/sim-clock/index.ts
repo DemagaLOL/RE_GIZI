@@ -1,7 +1,7 @@
 /**
- * Fitur simulasi waktu untuk demo: panel pengatur jam aplikasi (laju, jeda, lompat,
- * kembali ke waktu nyata) dan pita penanda saat jam disimulasikan. Batas aman dan
- * degradasi kategori sisa makanan (A → B → C → D) mengikuti jam ini.
+ * Fitur demo: panel pengatur jam aplikasi (laju, jeda, lompat, kembali ke waktu nyata),
+ * pengisian riwayat contoh untuk menguji statistik, dan pita penanda saat jam disimulasikan.
+ * Batas aman dan degradasi kategori sisa makanan (A → B → C → D) mengikuti jam ini.
  */
 
 export { clockAction } from "./actions"

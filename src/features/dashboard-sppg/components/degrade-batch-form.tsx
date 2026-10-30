@@ -50,7 +50,7 @@ export function DegradeBatchForm({
   }
 
   return (
-    <form action={formAction} className="flex flex-col gap-3 rounded-lg border p-3">
+    <form action={formAction} className="flex w-full flex-col gap-3 rounded-lg border p-3">
       <input type="hidden" name="batchId" value={batchId} />
       <fieldset className="flex flex-col gap-2">
         <legend className="mb-1 text-sm font-medium">Turunkan ke kategori</legend>

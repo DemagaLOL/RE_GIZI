@@ -13,6 +13,17 @@ export type PickupFormState =
 /** State form turunkan kategori untuk `useActionState`. */
 export type DashboardFormState = { status: "idle" } | { status: "error"; message: string }
 
+/** Field form ubah batch yang nilainya dikembalikan saat galat. */
+export type EditBatchField = "menu" | "quantity" | "notes"
+
+/**
+ * State form ubah batch. Saat galat, isian dikembalikan lewat `values` karena React
+ * mengosongkan form setelah action selesai. `idle` setelah berhasil menutup form.
+ */
+export type EditBatchFormState =
+  | { status: "idle" }
+  | { status: "error"; message: string; values?: Partial<Record<EditBatchField, string>> }
+
 /** Field form pendaftaran sisa yang nilainya dikembalikan saat galat. */
 export type CreateBatchField =
   | "menu"

@@ -17,6 +17,13 @@ export async function getSession(): Promise<Session> {
   return getIdentityBySessionToken(token)
 }
 
+/** Sesi peran apa pun wajib; selain itu diarahkan ke halaman masuk. */
+export async function requireSession(): Promise<NonNullable<Session>> {
+  const session = await getSession()
+  if (!session) redirect("/masuk")
+  return session
+}
+
 /** Sesi SPPG wajib; selain itu diarahkan ke halaman masuk. */
 export async function requireSppgSession(): Promise<Extract<Session, { role: "sppg" }>> {
   const session = await getSession()

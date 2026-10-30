@@ -3,11 +3,13 @@
 import { revalidatePath } from "next/cache"
 import {
   advanceClock,
+  clearDemoHistory,
   CLOCK_SPEED_PRESETS,
+  DEMO_HISTORY_DAYS,
   resetClock,
   resetDemoData,
+  seedDemoHistory,
   setClock,
-  type ClockState,
   type DataResult,
 } from "@/lib/data"
 import { getSession, signOut } from "@/features/session"
@@ -16,7 +18,7 @@ import { ADVANCE_OPTIONS_HOURS } from "./options"
 import type { ClockFormState } from "./types"
 
 /** Ubah hasil data layer menjadi state form. */
-function toFormState(result: DataResult<ClockState>, message: string): ClockFormState {
+function toFormState(result: DataResult<unknown>, message: string): ClockFormState {
   return result.ok ? { status: "success", message } : { status: "error", message: result.error }
 }
 
@@ -24,7 +26,8 @@ function toFormState(result: DataResult<ClockState>, message: string): ClockForm
  * Server Action panel simulasi waktu (khusus SPPG). Aksi dipilih lewat field `intent`:
  * `speed:<n>`, `pause`, `resume`, `advance:<jam>`, `jump` (field `at`, waktu WIB dari
  * `datetime-local`), `reset` (kembali ke waktu nyata), atau `reset-data` (kembali ke waktu
- * nyata sekaligus mengosongkan data demo; semua pengguna keluar).
+ * nyata sekaligus mengosongkan data demo; semua pengguna keluar), `demo-data` (isi riwayat
+ * contoh), atau `demo-data-clear` (hapus riwayat contoh).
  */
 export async function clockAction(
   _prev: ClockFormState,
@@ -65,6 +68,13 @@ export async function clockAction(
   } else if (kind === "reset") {
     await resetClock()
     state = { status: "success", message: "Jam kembali ke waktu nyata." }
+  } else if (kind === "demo-data") {
+    state = toFormState(
+      await seedDemoHistory(session.sppg.id),
+      `Riwayat contoh ${DEMO_HISTORY_DAYS} hari terakhir sudah diisi. Lihat hasilnya di Dasbor dan Laporan.`
+    )
+  } else if (kind === "demo-data-clear") {
+    state = toFormState(await clearDemoHistory(), "Riwayat contoh dihapus.")
   } else if (kind === "reset-data") {
     const result = await resetDemoData()
     if (!result.ok) return { status: "error", message: result.error }

@@ -76,14 +76,29 @@ Batas aman selalu dihitung **sejak makanan dimasak**, bukan sejak ompreng dikemb
 
 Roti, biskuit, dan makanan kering sejenis tahan lebih lama daripada makanan matang. Untuk Kategori A, petugas dapat memilih jenis **makanan kering** dan menentukan batas layak dari kemasannya (paling lama 7 hari, `DRY_MAX_DAYS`). Setelah batas layak itu lewat, batch tetap turun ke B lalu C dengan selisih yang sama seperti makanan matang: B berlaku sampai 20 jam setelah batas layak, C sampai 68 jam setelahnya, lalu D.
 
+### Aturan klaim
+
+| Aturan | Nilai |
+|---|---|
+| Tenggat ambil | A 1 jam, A makanan kering 24 jam, B 6 jam, C 24 jam sejak diklaim; tidak melewati batas aman batch |
+| Jatah per penerima per batch | Kategori A: setengah batch, minimal 10 porsi. B dan C tidak dibatasi agar sisa cepat habis |
+| Klaim aktif | Satu per batch, paling banyak 5 sekaligus per penerima |
+
+Klaim yang lewat tenggat batal otomatis dan jumlahnya kembali ke sisa batch. Nilai-nilai ini adalah parameter rancangan di `src/lib/data/constants.ts`.
+
+Batch yang sudah turun kategori jumlahnya terkunci karena merupakan hasil konversi. Batch yang sudah jatuh ke Kategori D melalui penurunan juga tidak dapat ditarik, agar sisanya tetap masuk antrean TPS. Batch yang sebagian sudah diambil penerima tidak dapat ditarik karena penyalurannya nyata terjadi; kurangi jumlahnya lewat **Ubah Data**.
+
 ## Fitur utama
 
 - **Pencatatan sisa pangan oleh SPPG** — menu, kategori, jumlah, waktu matang, dan catatan; isian waktu menyesuaikan kategori, termasuk pilihan makanan kering untuk Kategori A.
 - **Degradasi kategori otomatis dan manual** beserta riwayat lengkapnya.
-- **Daftar dan klaim menurut jenis penerima** — penerima hanya melihat kategori yang boleh ia klaim; daftar dapat diurutkan menurut batas aman atau jarak, dengan tautan arah ke lokasi SPPG. Klaim yang belum diambil menampilkan tenggat pengambilan.
+- **Pengelolaan batch oleh SPPG** — menu, jumlah, dan catatan dapat diperbaiki. Batch juga dapat ditarik dengan alasan tertulis; batch yang ditarik hilang dari semua daftar dan angka, seolah tidak pernah didaftarkan. Waktu masak dan kategori tidak dapat diubah.
+- **Daftar dan klaim menurut jenis penerima** — penerima hanya melihat kategori yang boleh ia klaim; daftar dapat diurutkan menurut batas aman atau jarak, dengan tautan arah ke lokasi SPPG.
+- **Tenggat ambil dan jatah klaim** — klaim yang tidak diambil sampai tenggat batal otomatis, petugas SPPG dapat membatalkan klaim, dan jatah Kategori A dibatasi per penerima (lihat [Aturan klaim](#aturan-klaim)).
 - **Serah terima dengan kode ambil 6 digit** — kode hanya terlihat oleh penerima, lalu dimasukkan dan dikonfirmasi petugas SPPG.
-- **Antrean pengangkutan kategori D untuk TPS** — detail batch D hanya terlihat oleh TPS dan SPPG pemiliknya; peran lain hanya melihat angka ringkasan.
+- **Antrean pengangkutan kategori D untuk TPS** — detail batch D hanya terlihat oleh TPS dan SPPG pemiliknya; peran lain hanya melihat angka ringkasan. SPPG melihat riwayat pengangkutan batch miliknya.
 - **Dasbor dampak SPPG** — jumlah sisa pangan yang tersalurkan per kategori (dihitung setelah serah terima dikonfirmasi) dan klaim yang masih menunggu diambil.
+- **Laporan sisa pangan** — tren penyaluran harian, rincian kejadian per periode (paling panjang 31 hari) dengan filter kalender hari dan kategori, unduhan CSV yang rapi di Excel berbahasa Indonesia, dan tampilan cetak. Laporan ini alat bantu pendataan, bukan format resmi BGN.
 - **Jam simulasi** untuk demo dan pengujian (dipercepat sampai 600×, dijeda, atau dimajukan).
 
 ## Teknologi
@@ -162,10 +177,12 @@ Menunggu 4 jam sungguhan tidak praktis untuk demo, jadi seluruh waktu domain sis
 1. Masuk sebagai `sppg@demo.regizi.id`, lalu catat satu batch Kategori A.
 2. Masuk sebagai `umkm@demo.regizi.id` di jendela lain, lalu klaim sebagian batch tersebut.
 3. Kembali ke akun SPPG, buka **`/waktu`**, dan percepat atau majukan jam lebih dari 4 jam.
-4. Batch turun ke Kategori B, klaim yang tertunda dibatalkan, dan batch kini tampil untuk peternak. Riwayat perubahannya dapat dilihat di detail batch.
+4. Batch turun ke Kategori B, klaim yang tertunda dibatalkan, dan batch kini tampil untuk peternak. Bila jam hanya dimajukan 1 jam, klaim batal karena lewat tenggat ambil dan batch tetap Kategori A. Riwayat perubahannya dapat dilihat di detail batch.
 5. Lanjutkan sampai Kategori D, lalu masuk sebagai `tps@demo.regizi.id` dan tandai batch "Sudah Diangkut".
 
 Sesi login tetap memakai waktu nyata, sehingga mempercepat jam tidak membuat sesi kedaluwarsa.
+
+Untuk menguji statistik tanpa mencatat data satu per satu, tekan **Isi Riwayat 14 Hari** di menu **Demo** (`/waktu`). Riwayat contoh berakhir kemarin, ikut terhitung di semua angka, dan dapat diganti atau dihapus tanpa menyentuh data lain. Tombol ini tersedia dalam mode demo.
 
 Jam simulasi tidak dapat dimundurkan. Untuk memulai ulang dari keadaan bersih, tekan **Reset jam & data demo** di `/waktu` (tersedia dalam mode demo) atau jalankan `npm run db:reset`. Keduanya mengosongkan seluruh data dan mengisi ulang akun demo.
 
@@ -176,13 +193,15 @@ Jam simulasi tidak dapat dimundurkan. Untuk memulai ulang dari keadaan bersih, t
 | `/` | Beranda dan ringkasan dampak |
 | `/tentang`, `/kontak` | Pengenalan produk dan kontak |
 | `/masuk`, `/daftar` | Masuk dan pendaftaran penerima |
-| `/dasbor` | Dasbor SPPG: dampak, konfirmasi pengambilan, dan daftar batch beserta klaim dan riwayatnya |
+| `/dasbor` | Dasbor SPPG: dampak, konfirmasi pengambilan, pengelolaan batch dan klaim, serta riwayat pengangkutan TPS |
 | `/dasbor/baru` | Pencatatan sisa pangan (SPPG) |
+| `/dasbor/laporan` | Laporan sisa pangan per periode, unduhan CSV, dan cetak (SPPG) |
 | `/sisa-makanan` | Daftar sisa pangan yang dapat diklaim |
 | `/sisa-makanan/[id]` | Detail batch dan klaim |
 | `/klaim-saya` | Klaim milik penerima beserta kode ambil |
 | `/pembuangan` | Antrean pengangkutan Kategori D (TPS) |
-| `/waktu` | Pengaturan jam simulasi (SPPG) |
+| `/waktu` | Panel demo: riwayat contoh dan jam simulasi (SPPG) |
+| `/profil` | Nama terdaftar, email, dan peran akun (semua peran) |
 
 ## Struktur proyek
 
@@ -195,9 +214,11 @@ src/
     listing/            #   daftar dan detail sisa pangan
     claim/              #   klaim dan kode ambil
     disposal/           #   antrean TPS
+    report/             #   grafik tren dan laporan SPPG
     dashboard-sppg/     #   pencatatan, konfirmasi pengambilan, degradasi manual, dasbor dampak
     sim-clock/          #   jam simulasi
     session/            #   sesi, navigasi per peran
+    profile/            #   profil akun
     landing/ about/ contact/
   components/
     ui/                 # Primitif shadcn/ui
@@ -214,10 +235,15 @@ Aturan domain yang penting ada di `src/lib/data`:
 
 - `constants.ts` — batas aman, batas makanan kering, penerima yang berhak per kategori, konversi porsi ke kg
 - `degradation.ts` — penurunan kategori otomatis dan manual, termasuk jendela makanan kering
-- `claim-cancel.ts` — pembatalan klaim saat batch turun kategori
+- `claim-core.ts`, `claim-rules.ts` — klaim, jatah penerima, dan tenggat ambil
+- `claim-cancel.ts` — pembatalan klaim oleh penerima atau SPPG dan saat lewat tenggat
+- `batch-edit.ts` — perubahan dan penarikan batch oleh SPPG
+- `due-changes.ts` — perubahan karena waktu berjalan (degradasi dan klaim lewat tenggat)
 - `disposals.ts`, `disposal-core.ts` — antrean dan pencatatan pengangkutan TPS
 - `clock.ts` — jam aplikasi dan simulasinya
 - `geo.ts` — perhitungan jarak (haversine)
+- `report-core.ts`, `report-csv.ts` — laporan per periode (hari WIB) dan berkas CSV
+- `demo-data.ts` — riwayat contoh untuk menguji statistik
 
 ## Basis data dan migrasi
 
@@ -237,7 +263,7 @@ Migrasi diterapkan otomatis saat aplikasi berjalan.
 npm test
 ```
 
-Menjalankan 52 tes unit untuk aturan degradasi (termasuk makanan kering), pembatalan klaim, pengangkutan TPS, jam simulasi, validasi dan pembulatan jumlah, serta perhitungan jarak. Sebagian tes berjalan terhadap basis data SQLite sementara.
+Menjalankan 140 tes unit untuk aturan degradasi (termasuk makanan kering), klaim, jatah dan tenggat ambil, pembatalan klaim, perubahan dan penarikan batch, laporan dan CSV, data demo, pengangkutan TPS, jam simulasi, validasi dan pembulatan jumlah, serta perhitungan jarak. Sebagian tes berjalan terhadap basis data SQLite sementara.
 
 Tes untuk prototipe Python di `api/`:
 

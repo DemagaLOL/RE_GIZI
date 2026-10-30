@@ -1,13 +1,15 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
+import { redirect } from "next/navigation"
 import { cancelClaim, claimBatch } from "@/lib/data"
 import { getSession } from "@/features/session"
 import type { CancelClaimState, ClaimFormState } from "./types"
 
 /**
- * Server Action klaim batch oleh penerima yang sedang masuk. Validasi kelayakan,
- * sisa, dan batas aman dilakukan di data layer (`claimBatch`).
+ * Server Action klaim batch oleh penerima yang sedang masuk. Validasi kelayakan, sisa,
+ * jatah, dan batas aman dilakukan di data layer (`claimBatch`). Berhasil → `/klaim-saya`:
+ * panel klaim di halaman detail tidak lagi menampilkan form setelah penerima punya klaim aktif.
  */
 export async function claimBatchAction(
   _prev: ClaimFormState,
@@ -31,7 +33,7 @@ export async function claimBatchAction(
   if (!result.ok) return { status: "error", message: result.error, quantity: quantityText }
 
   revalidateClaimPages(batchId)
-  return { status: "success", pickupCode: result.data.pickupCode, quantity: result.data.quantity }
+  redirect("/klaim-saya?baru=1")
 }
 
 /**

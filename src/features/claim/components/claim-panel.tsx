@@ -1,7 +1,12 @@
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { ELIGIBLE_RECIPIENTS, RECIPIENT_TYPE_LABEL, type SurplusBatchWithSppg } from "@/lib/data"
+import {
+  ELIGIBLE_RECIPIENTS,
+  getClaimAllowance,
+  RECIPIENT_TYPE_LABEL,
+  type SurplusBatchWithSppg,
+} from "@/lib/data"
 import { getSession } from "@/features/session"
 import { ClaimForm } from "./claim-form"
 
@@ -56,7 +61,25 @@ export async function ClaimPanel({ batch }: { batch: SurplusBatchWithSppg }) {
       </Notice>
     )
   } else {
-    content = <ClaimForm batchId={batch.id} unit={batch.unit} remaining={batch.remainingQuantity} />
+    const allowance = await getClaimAllowance(batch, session.recipient.id)
+    content = allowance.ok ? (
+      <ClaimForm
+        batchId={batch.id}
+        unit={batch.unit}
+        remaining={batch.remainingQuantity}
+        allowance={allowance.data}
+      />
+    ) : (
+      <Notice
+        action={
+          <Button asChild variant="outline" size="lg">
+            <Link href="/klaim-saya">Lihat Klaim Saya</Link>
+          </Button>
+        }
+      >
+        {allowance.error}
+      </Notice>
+    )
   }
 
   return (

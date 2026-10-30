@@ -220,12 +220,7 @@ export function applyDueDegradations(tx: Tx, now: number): void {
   }
 }
 
-/**
- * Turunkan semua batch yang jatuh tempo pada `now` (setara cron, dijalankan saat data
- * dibaca). Pengecekan murah dulu; transaksi `IMMEDIATE` hanya dibuka bila ada yang jatuh tempo.
- */
-export function degradeDueBatches(db: Db, now: number): void {
-  const any = db.select({ id: schema.batches.id }).from(schema.batches).where(dueCondition(now)).get()
-  if (!any) return
-  db.transaction((tx) => applyDueDegradations(tx, now), { behavior: "immediate" })
+/** `true` bila ada batch yang jatuh tempo pada `now` (pengecekan murah sebelum membuka transaksi). */
+export function hasDueDegradations(db: Db, now: number): boolean {
+  return Boolean(db.select({ id: schema.batches.id }).from(schema.batches).where(dueCondition(now)).get())
 }

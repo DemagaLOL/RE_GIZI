@@ -7,7 +7,7 @@ import { ClockPanel } from "@/features/sim-clock"
 import { canResetDemoData, getClockState, hasFutureData } from "@/lib/data"
 
 export const metadata: Metadata = {
-  title: "Simulasi Waktu",
+  title: "Panel Demo",
 }
 
 /** Panel jam setelah sesi SPPG dipastikan. */
@@ -21,7 +21,7 @@ async function ClockContent() {
   if (!clock.enabled) {
     return (
       <p className="rounded-xl border bg-card p-4 text-muted-foreground md:p-6">
-        Simulasi waktu dinonaktifkan di server ini. Jalankan server dengan variabel lingkungan{" "}
+        Panel demo dinonaktifkan di server ini. Jalankan server dengan variabel lingkungan{" "}
         <code className="font-mono">SIM_CLOCK=1</code> untuk mengaktifkannya.
       </p>
     )
@@ -29,14 +29,15 @@ async function ClockContent() {
   return <ClockPanel clock={clock} futureData={futureData} canResetData={canResetDemoData()} />
 }
 
-/** Rute `/waktu`: simulasi waktu untuk demo degradasi kategori (khusus SPPG). */
+/** Rute `/waktu`: panel demo berisi data contoh dan simulasi waktu (khusus SPPG). */
 export default function Page() {
   return (
     <Container className="flex max-w-3xl flex-col gap-8 py-8 md:py-12">
       <div className="flex flex-col gap-1">
-        <h1 className="text-3xl font-bold tracking-tight md:text-4xl">Simulasi Waktu</h1>
+        <h1 className="text-3xl font-bold tracking-tight md:text-4xl">Panel Demo</h1>
         <p className="text-muted-foreground">
-          Percepat atau lompati waktu untuk melihat sisa makanan turun kategori dari A sampai D.
+          Isi data contoh untuk menguji statistik, atau percepat waktu untuk melihat sisa makanan
+          turun kategori dari A sampai D.
         </p>
       </div>
       <Suspense fallback={<Skeleton className="h-96 w-full rounded-xl" />}>

@@ -4,11 +4,13 @@ import {
   applyClockInput,
   isSimClockEnabled,
   readClockAnchor,
+  simNow,
   toClockState,
   writeClockAnchor,
 } from "./clock"
 import { getDb } from "./db/client"
 import * as schema from "./db/schema"
+import { applyDemoHistory, removeDemoHistory } from "./demo-data"
 import { isDemoMode, resetDatabase } from "./seed"
 import type { ClockState, DataResult, SetClockInput } from "./types"
 
@@ -17,6 +19,7 @@ const HOUR = 60 * 60 * 1000
 const MAX_ADVANCE_HOURS = 7 * 24
 
 const DISABLED_ERROR = "Simulasi waktu tidak aktif di server ini."
+const DEMO_ONLY_ERROR = "Data demo hanya tersedia dalam mode demo."
 
 /** Keadaan jam aplikasi saat ini (waktu, laju, jeda). */
 export async function getClockState(): Promise<ClockState> {
@@ -88,6 +91,27 @@ export async function resetDemoData(): Promise<DataResult<null>> {
   await io()
   if (!canResetDemoData()) return { ok: false, error: "Reset data hanya tersedia dalam mode demo." }
   resetDatabase(getDb(), Date.now())
+  return { ok: true, data: null }
+}
+
+/**
+ * Isi riwayat contoh untuk menguji statistik, menggantikan riwayat contoh sebelumnya. Data
+ * lain tidak tersentuh. Syaratnya sama dengan `resetDemoData`.
+ * @returns Jumlah batch contoh yang dibuat.
+ */
+export async function seedDemoHistory(sppgId: string): Promise<DataResult<number>> {
+  await io()
+  if (!canResetDemoData()) return { ok: false, error: DEMO_ONLY_ERROR }
+  return getDb().transaction((tx) => applyDemoHistory(tx, sppgId, simNow(tx)), {
+    behavior: "immediate",
+  })
+}
+
+/** Hapus riwayat contoh saja; data lain dan akun tidak tersentuh. */
+export async function clearDemoHistory(): Promise<DataResult<null>> {
+  await io()
+  if (!canResetDemoData()) return { ok: false, error: DEMO_ONLY_ERROR }
+  getDb().transaction((tx) => removeDemoHistory(tx), { behavior: "immediate" })
   return { ok: true, data: null }
 }
 

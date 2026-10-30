@@ -3,11 +3,14 @@
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import {
+  cancelClaimBySppg,
   confirmPickup,
   createBatch,
   degradeBatch,
   getNow,
   getPickupPreview,
+  updateBatch,
+  withdrawBatch,
   type SurplusCategory,
 } from "@/lib/data"
 import { getSession } from "@/features/session"
@@ -17,10 +20,13 @@ import type {
   CreateBatchField,
   CreateBatchFormState,
   DashboardFormState,
+  EditBatchField,
+  EditBatchFormState,
   PickupFormState,
 } from "./types"
 
 const CATEGORIES: readonly SurplusCategory[] = ["A", "B", "C", "D"]
+const EDIT_BATCH_FIELDS: readonly EditBatchField[] = ["menu", "quantity", "notes"]
 const CREATE_BATCH_FIELDS: readonly CreateBatchField[] = [
   "menu",
   "quantity",
@@ -41,12 +47,17 @@ async function currentSppgId(): Promise<string | null> {
   return session?.role === "sppg" ? session.sppg.id : null
 }
 
-/** Revalidasi halaman yang menampilkan batch/klaim setelah mutasi. */
-function revalidateListings(): void {
+/**
+ * Revalidasi halaman yang menampilkan batch/klaim setelah mutasi.
+ * @param batchId Batch yang berubah, agar halaman detailnya ikut diperbarui.
+ */
+function revalidateListings(batchId?: string): void {
   revalidatePath("/dasbor")
   revalidatePath("/sisa-makanan")
   revalidatePath("/klaim-saya")
+  revalidatePath("/pembuangan")
   revalidatePath("/")
+  if (batchId) revalidatePath(`/sisa-makanan/${batchId}`)
 }
 
 /**
@@ -163,5 +174,75 @@ export async function degradeBatchAction(
   if (!result.ok) return { status: "error", message: result.error }
 
   revalidateListings()
+  return { status: "idle" }
+}
+
+/**
+ * Server Action SPPG mengubah menu, jumlah, dan catatan batch. Aturan jumlah divalidasi di
+ * data layer (`updateBatch`). Berhasil → `idle`: form ditutup dan kartu batch dirender ulang.
+ */
+export async function updateBatchAction(
+  _prev: EditBatchFormState,
+  formData: FormData
+): Promise<EditBatchFormState> {
+  // React mengosongkan form setelah action selesai; kembalikan isian agar tidak perlu diketik ulang.
+  const values = Object.fromEntries(EDIT_BATCH_FIELDS.map((f) => [f, text(formData, f)]))
+  const fail = (message: string): EditBatchFormState => ({ status: "error", message, values })
+
+  const sppgId = await currentSppgId()
+  if (!sppgId) return fail("Masuk sebagai SPPG terlebih dahulu.")
+  const batchId = text(formData, "batchId")
+  if (!batchId) return fail("Batch tidak valid.")
+
+  const result = await updateBatch({
+    sppgId,
+    batchId,
+    menu: values.menu,
+    quantity: Number(values.quantity),
+    notes: values.notes,
+  })
+  if (!result.ok) return fail(result.error)
+
+  revalidateListings(batchId)
+  return { status: "idle" }
+}
+
+/**
+ * Server Action SPPG menarik batch dengan alasan tertulis. Klaim yang menunggu diambil
+ * dibatalkan oleh data layer (`withdrawBatch`).
+ */
+export async function withdrawBatchAction(
+  _prev: DashboardFormState,
+  formData: FormData
+): Promise<DashboardFormState> {
+  const sppgId = await currentSppgId()
+  if (!sppgId) return { status: "error", message: "Masuk sebagai SPPG terlebih dahulu." }
+  const batchId = text(formData, "batchId")
+  if (!batchId) return { status: "error", message: "Batch tidak valid." }
+
+  const result = await withdrawBatch({ sppgId, batchId, reason: text(formData, "reason") })
+  if (!result.ok) return { status: "error", message: result.error }
+
+  revalidateListings(batchId)
+  return { status: "idle" }
+}
+
+/**
+ * Server Action SPPG membatalkan klaim yang menunggu diambil. Kepemilikan batch & status
+ * klaim divalidasi di data layer (`cancelClaimBySppg`); jumlahnya kembali ke sisa batch.
+ */
+export async function cancelClaimBySppgAction(
+  _prev: DashboardFormState,
+  formData: FormData
+): Promise<DashboardFormState> {
+  const sppgId = await currentSppgId()
+  if (!sppgId) return { status: "error", message: "Masuk sebagai SPPG terlebih dahulu." }
+  const claimId = text(formData, "claimId")
+  if (!claimId) return { status: "error", message: "Klaim tidak valid." }
+
+  const result = await cancelClaimBySppg({ claimId, sppgId })
+  if (!result.ok) return { status: "error", message: result.error }
+
+  revalidateListings(result.data.batchId)
   return { status: "idle" }
 }

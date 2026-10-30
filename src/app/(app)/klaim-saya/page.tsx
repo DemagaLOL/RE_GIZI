@@ -15,8 +15,23 @@ async function Claims() {
   return <MyClaims recipientId={session.recipient.id} />
 }
 
+/** Konfirmasi setelah klaim baru berhasil (`?baru=1`). Render dalam `<Suspense>`. */
+async function ClaimedNotice({
+  searchParams,
+}: {
+  searchParams: PageProps<"/klaim-saya">["searchParams"]
+}) {
+  const { baru } = await searchParams
+  if (baru !== "1") return null
+  return (
+    <p role="status" className="rounded-lg bg-secondary px-4 py-3 text-sm font-medium text-secondary-foreground">
+      Klaim berhasil. Tunjukkan kode ambil ke petugas SPPG sebelum tenggatnya lewat.
+    </p>
+  )
+}
+
 /** Rute `/klaim-saya`: riwayat klaim penerima beserta kode ambil. */
-export default function Page() {
+export default function Page({ searchParams }: PageProps<"/klaim-saya">) {
   return (
     <Container className="flex flex-col gap-6 py-8 md:py-12">
       <section className="flex flex-col gap-2">
@@ -25,6 +40,9 @@ export default function Page() {
           Tunjukkan kode ambil ke petugas SPPG saat mengambil sisa makanan.
         </p>
       </section>
+      <Suspense fallback={null}>
+        <ClaimedNotice searchParams={searchParams} />
+      </Suspense>
       <Suspense fallback={<Skeleton className="h-64 w-full rounded-xl" />}>
         <Claims />
       </Suspense>

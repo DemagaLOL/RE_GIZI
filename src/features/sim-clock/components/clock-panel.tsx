@@ -1,10 +1,15 @@
 "use client"
 
 import { useActionState, useState } from "react"
-import { DatabaseZap, FastForward, Loader2, Pause, Play, RotateCcw } from "lucide-react"
+import { ChartColumn, DatabaseZap, FastForward, Loader2, Pause, Play, RotateCcw, Trash2 } from "lucide-react"
 import { FoodStatusBadge } from "@/components/shared/food-status-badge"
 import { Button } from "@/components/ui/button"
-import { CATEGORY_ORDER, CLOCK_SPEED_PRESETS, SAFE_WINDOW_HOURS } from "@/lib/data/constants"
+import {
+  CATEGORY_ORDER,
+  CLOCK_SPEED_PRESETS,
+  DEMO_HISTORY_DAYS,
+  SAFE_WINDOW_HOURS,
+} from "@/lib/data/constants"
 import type { ClockState } from "@/lib/data/types"
 import { formatSpeed } from "@/lib/format"
 import { clockAction } from "../actions"
@@ -27,9 +32,9 @@ function GroupTitle({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * Panel simulasi waktu untuk demo: atur laju (1×–600×), jeda/lanjut, lompat beberapa
- * jam, pindah ke tanggal-jam tertentu, atau kembali ke waktu nyata. Kategori sisa
- * makanan turun otomatis mengikuti jam ini.
+ * Panel demo: isi riwayat contoh untuk menguji statistik, serta simulasi waktu (atur laju
+ * 1×–600×, jeda/lanjut, lompat beberapa jam, pindah ke tanggal-jam tertentu, atau kembali
+ * ke waktu nyata). Kategori sisa makanan turun otomatis mengikuti jam ini.
  * @param clock Keadaan jam dari server (`getClockState`).
  * @param futureData Ada data bertanggal setelah waktu nyata (`hasFutureData`); menampilkan peringatan.
  * @param canResetData Tombol "Reset jam & data demo" tersedia (`canResetDemoData`, mode demo).
@@ -74,6 +79,34 @@ export function ClockPanel({
         >
           {state.message}
         </p>
+      )}
+
+      {canResetData && (
+        <section className="flex flex-col gap-3">
+          <GroupTitle>Data demo statistik</GroupTitle>
+          <div className="flex flex-wrap gap-2">
+            <Button type="submit" name="intent" value="demo-data" className="h-11" disabled={pending}>
+              <ChartColumn data-icon="inline-start" aria-hidden />
+              Isi Riwayat {DEMO_HISTORY_DAYS} Hari
+            </Button>
+            <Button
+              type="submit"
+              name="intent"
+              value="demo-data-clear"
+              variant="ghost"
+              className="h-11"
+              disabled={pending}
+            >
+              <Trash2 data-icon="inline-start" aria-hidden />
+              Hapus Riwayat Contoh
+            </Button>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Mengisi contoh penyaluran dan pengangkutan sampai kemarin untuk menguji Dasbor, Laporan,
+            dan statistik Beranda. Data contoh ikut terhitung di semua angka. Data lain tidak
+            tersentuh, dan mengisi ulang akan menggantikan contoh sebelumnya.
+          </p>
+        </section>
       )}
 
       <section className="flex flex-col gap-3">

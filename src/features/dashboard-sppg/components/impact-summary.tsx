@@ -3,7 +3,7 @@ import { getImpactStats } from "@/lib/data"
 import { formatNumber } from "@/lib/format"
 
 /** Satu ubin angka. */
-function StatTile({ value, unit, label }: { value: number; unit?: string; label: string }) {
+export function StatTile({ value, unit, label }: { value: number; unit?: string; label: string }) {
   return (
     <Card size="sm">
       <CardContent className="flex flex-col gap-1">

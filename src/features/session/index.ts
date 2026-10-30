@@ -9,11 +9,13 @@ export { AppNav } from "./components/app-nav"
 export { LoginPanel } from "./components/login-panel"
 export { RegisterForm } from "./components/register-form"
 export { SessionNav } from "./components/session-nav"
+export { SignOutButton } from "./components/sign-out-button"
 export { UpdateLocationButton } from "./components/update-location-button"
 export { identityName, ROLE_HOME } from "./identity"
 export {
   getSession,
   requireRecipientSession,
+  requireSession,
   requireSppgSession,
   requireTpsSession,
 } from "./session"

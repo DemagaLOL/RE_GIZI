@@ -62,7 +62,10 @@ export async function MyClaims({ recipientId }: { recipientId: string }) {
     <div className="grid gap-4 md:grid-cols-2">
       {claims.map((claim) => {
         // Detail batch kategori D hanya untuk TPS & SPPG pemiliknya: tanpa tautan detail dan alamat.
-        const discarded = claim.batch.category === "D"
+        // Batch yang ditarik juga tidak punya halaman detail lagi.
+        const unlinked = claim.batch.category === "D" || claim.batch.status === "withdrawn"
+        // Klaim lama tanpa tenggat sendiri mengikuti batas aman batch.
+        const deadline = claim.pickupDeadline ?? claim.batch.safeUntil
         return (
           <Card key={claim.id}>
             <CardHeader>
@@ -71,7 +74,7 @@ export async function MyClaims({ recipientId }: { recipientId: string }) {
                 <Badge variant={STATUS_VARIANT[claim.status]}>{CLAIM_STATUS_LABEL[claim.status]}</Badge>
               </div>
               <CardTitle className="leading-snug">
-                {discarded ? (
+                {unlinked ? (
                   claim.batch.menu
                 ) : (
                   <Link href={`/sisa-makanan/${claim.batchId}`} className="hover:underline">
@@ -81,7 +84,7 @@ export async function MyClaims({ recipientId }: { recipientId: string }) {
               </CardTitle>
               <CardDescription className="flex items-start gap-1">
                 <MapPin className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-                {discarded ? claim.batch.sppg.name : `${claim.batch.sppg.name} — ${claim.batch.sppg.address}`}
+                {unlinked ? claim.batch.sppg.name : `${claim.batch.sppg.name} — ${claim.batch.sppg.address}`}
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-wrap items-end justify-between gap-3">
@@ -91,17 +94,15 @@ export async function MyClaims({ recipientId }: { recipientId: string }) {
                 </p>
                 <p className="text-sm text-muted-foreground">Diklaim {formatDateTime(claim.claimedAt)}</p>
                 {claim.status === "pending" && (
-                  // Klaim batal otomatis bila batch turun kategori, jadi tenggat ambil = batas aman batch.
                   <p
                     className={cn(
                       "mt-1 flex w-fit items-center gap-1 text-sm font-medium",
-                      isNearDeadline(claim.batch.safeUntil, now) &&
+                      isNearDeadline(deadline, now) &&
                         "rounded-full bg-warning px-2 py-0.5 text-warning-foreground"
                     )}
                   >
                     <Clock className="size-3.5 shrink-0" aria-hidden />
-                    Ambil sebelum {formatDateTime(claim.batch.safeUntil)} (
-                    {formatTimeLeft(claim.batch.safeUntil, now)})
+                    Ambil sebelum {formatDateTime(deadline)} ({formatTimeLeft(deadline, now)})
                   </p>
                 )}
                 {claim.cancelReason === "degraded" && (
@@ -112,6 +113,19 @@ export async function MyClaims({ recipientId }: { recipientId: string }) {
                 )}
                 {claim.cancelReason === "recipient" && (
                   <p className="mt-1 text-sm text-muted-foreground">Dibatalkan oleh Anda.</p>
+                )}
+                {claim.cancelReason === "expired" && (
+                  <p className="mt-1 text-sm text-destructive">
+                    Dibatalkan otomatis karena melewati tenggat ambil.
+                  </p>
+                )}
+                {claim.cancelReason === "sppg" && (
+                  <p className="mt-1 text-sm text-destructive">Dibatalkan oleh petugas SPPG.</p>
+                )}
+                {claim.cancelReason === "withdrawn" && (
+                  <p className="mt-1 text-sm text-destructive">
+                    Dibatalkan karena sisa ini ditarik SPPG.
+                  </p>
                 )}
               </div>
               {claim.status === "pending" && (

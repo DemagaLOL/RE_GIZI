@@ -1,47 +1,33 @@
 "use client"
 
 import { useActionState } from "react"
-import Link from "next/link"
-import { CheckCircle2, Loader2 } from "lucide-react"
+import { Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { QuantityUnit } from "@/lib/data/types"
-import { formatPickupCode } from "@/lib/format"
+import { formatQuantity } from "@/lib/format"
 import { claimBatchAction } from "../actions"
 import type { ClaimFormState } from "../types"
 
 const INITIAL_STATE: ClaimFormState = { status: "idle" }
 
 /**
- * Form klaim jumlah tertentu dari satu batch. Setelah berhasil menampilkan kode ambil
- * yang ditunjukkan ke petugas SPPG.
+ * Form klaim jumlah tertentu dari satu batch. Setelah berhasil, penerima diarahkan ke
+ * `/klaim-saya` yang menampilkan kode ambil dan tenggatnya.
+ * @param allowance Jumlah terbanyak yang masih boleh diklaim penerima ini (`getClaimAllowance`).
  */
 export function ClaimForm({
   batchId,
   unit,
   remaining,
+  allowance,
 }: {
   batchId: string
   unit: QuantityUnit
   remaining: number
+  allowance: number
 }) {
   const [state, formAction, pending] = useActionState(claimBatchAction, INITIAL_STATE)
-
-  if (state.status === "success") {
-    return (
-      <div className="flex flex-col items-center gap-3 rounded-xl bg-secondary p-6 text-center">
-        <CheckCircle2 className="size-10 text-success" aria-hidden />
-        <p className="text-secondary-foreground">
-          Klaim {state.quantity} {unit} berhasil. Tunjukkan kode ini ke petugas SPPG:
-        </p>
-        <p className="font-mono text-4xl font-bold tracking-widest">
-          {formatPickupCode(state.pickupCode)}
-        </p>
-        <Button asChild variant="outline" className="mt-2">
-          <Link href="/klaim-saya">Lihat Klaim Saya</Link>
-        </Button>
-      </div>
-    )
-  }
+  const limit = Math.min(remaining, allowance)
 
   return (
     <form action={formAction} className="flex flex-col gap-3">
@@ -57,11 +43,11 @@ export function ClaimForm({
           inputMode={unit === "porsi" ? "numeric" : "decimal"}
           min={unit === "porsi" ? 1 : 0.1}
           step={unit === "porsi" ? 1 : 0.1}
-          max={remaining}
+          max={limit}
           defaultValue={
             state.status === "error" && state.quantity
               ? state.quantity
-              : Math.min(remaining, unit === "porsi" ? 10 : 5)
+              : Math.min(limit, unit === "porsi" ? 10 : 5)
           }
           required
           aria-invalid={state.status === "error" || undefined}
@@ -74,7 +60,8 @@ export function ClaimForm({
         </Button>
       </div>
       <p className="text-sm text-muted-foreground">
-        Maksimal {remaining} {unit}.
+        Maksimal {formatQuantity(limit, unit)}
+        {allowance < remaining ? " per penerima agar terbagi merata." : "."}
       </p>
       {state.status === "error" && (
         <p id="claim-error" role="alert" className="text-sm font-medium text-destructive">

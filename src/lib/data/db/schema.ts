@@ -72,6 +72,9 @@ export const batches = sqliteTable(
     status: text("status").$type<BatchStatus>().notNull(),
     notes: text("notes"),
     createdAt: text("created_at").notNull(),
+    /** Diisi saat `status = withdrawn`. */
+    withdrawnAt: text("withdrawn_at"),
+    withdrawReason: text("withdraw_reason"),
   },
   (t) => [
     index("batches_status_safe_until_idx").on(t.status, t.safeUntil),
@@ -96,6 +99,8 @@ export const claims = sqliteTable(
     status: text("status").$type<ClaimStatus>().notNull(),
     pickupCode: text("pickup_code").notNull().unique(),
     claimedAt: text("claimed_at").notNull(),
+    /** Tenggat ambil; null pada data lama (tenggatnya = batas aman batch). */
+    pickupDeadline: text("pickup_deadline"),
     pickedUpAt: text("picked_up_at"),
     /** Diisi saat `status = cancelled`; null pada data lama sebelum kolom ini ada. */
     cancelReason: text("cancel_reason").$type<ClaimCancelReason>(),
@@ -103,6 +108,7 @@ export const claims = sqliteTable(
   (t) => [
     index("claims_batch_id_idx").on(t.batchId),
     index("claims_recipient_id_idx").on(t.recipientId),
+    index("claims_status_pickup_deadline_idx").on(t.status, t.pickupDeadline),
   ]
 )
 

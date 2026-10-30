@@ -4,6 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
   ClipboardList,
+  FileText,
   House,
   Info,
   LayoutDashboard,
@@ -29,9 +30,13 @@ type AppNavIcon =
   | "contact"
   | "clock"
   | "disposal"
+  | "report"
 
-/** Satu tautan navigasi app shell. */
-type AppNavLink = { href: string; label: string; icon: AppNavIcon }
+/**
+ * Satu tautan navigasi app shell. `shortLabel` dipakai di tab bar mobile bila `label`
+ * terlalu panjang untuk satu baris.
+ */
+type AppNavLink = { href: string; label: string; shortLabel?: string; icon: AppNavIcon }
 
 const ICONS: Record<AppNavIcon, LucideIcon> = {
   dashboard: LayoutDashboard,
@@ -44,6 +49,7 @@ const ICONS: Record<AppNavIcon, LucideIcon> = {
   contact: MessageCircle,
   clock: Timer,
   disposal: Trash2,
+  report: FileText,
 }
 
 /** Tautan aktif = href terpanjang yang sama dengan, atau menjadi awalan, path saat ini. */
@@ -82,16 +88,18 @@ function AppTabBar({ links }: { links: readonly AppNavLink[] }) {
   return (
     <nav
       aria-label="Navigasi aplikasi"
-      className="fixed inset-x-0 bottom-0 z-40 border-t bg-background pb-[env(safe-area-inset-bottom)] md:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 border-t bg-background pb-[env(safe-area-inset-bottom)] md:hidden print:hidden"
     >
       <ul className="flex">
         {links.map((link) => {
           const Icon = ICONS[link.icon]
           const isActive = link.href === active
           return (
-            <li key={link.href} className="flex-1">
+            // `min-w-0`: lebar tab selalu sama, kata panjang tidak melebarkan kolomnya sendiri.
+            <li key={link.href} className="min-w-0 flex-1">
               <Link
                 href={link.href}
+                aria-label={link.label}
                 aria-current={isActive ? "page" : undefined}
                 className={cn(
                   "flex h-14 flex-col items-center justify-center gap-1 text-xs font-medium transition-colors",
@@ -99,7 +107,9 @@ function AppTabBar({ links }: { links: readonly AppNavLink[] }) {
                 )}
               >
                 <Icon className="size-5" aria-hidden />
-                {link.label}
+                <span className="w-full truncate px-0.5 text-center">
+                  {link.shortLabel ?? link.label}
+                </span>
               </Link>
             </li>
           )

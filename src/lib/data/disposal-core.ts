@@ -1,8 +1,8 @@
-import { eq } from "drizzle-orm"
-import type { Tx } from "./db/client"
-import { fromDisposal } from "./db/mappers"
+import { desc, eq } from "drizzle-orm"
+import type { Db, Tx } from "./db/client"
+import { fromDisposal, toDisposal } from "./db/mappers"
 import * as schema from "./db/schema"
-import type { CollectDisposalInput, DataResult, Disposal } from "./types"
+import type { CollectDisposalInput, DataResult, Disposal, DisposalWithTps } from "./types"
 
 /** Panjang maksimal catatan pengangkutan. */
 const NOTE_MAX_LENGTH = 200
@@ -42,4 +42,17 @@ export function applyCollection(
     .where(eq(schema.batches.id, batch.id))
     .run()
   return { ok: true, data: disposal }
+}
+
+/** Pengangkutan batch milik satu SPPG beserta nama TPS-nya, terbaru dulu. */
+export function selectDisposalsBySppg(db: Db, sppgId: string): DisposalWithTps[] {
+  return db
+    .select({ disposal: schema.disposals, menu: schema.batches.menu, tpsName: schema.tps.name })
+    .from(schema.disposals)
+    .innerJoin(schema.batches, eq(schema.disposals.batchId, schema.batches.id))
+    .innerJoin(schema.tps, eq(schema.disposals.tpsId, schema.tps.id))
+    .where(eq(schema.batches.sppgId, sppgId))
+    .orderBy(desc(schema.disposals.collectedAt))
+    .all()
+    .map((r) => ({ ...toDisposal(r.disposal), menu: r.menu, tpsName: r.tpsName }))
 }

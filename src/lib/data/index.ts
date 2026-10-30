@@ -13,6 +13,7 @@
 
 export {
   cancelClaim,
+  cancelClaimBySppg,
   claimBatch,
   confirmPickup,
   createBatch,
@@ -21,20 +22,25 @@ export {
   getBatches,
   getCategoryEvents,
   getCategoryEventsBySppg,
+  getClaimAllowance,
   getClaimsByBatch,
   getClaimsByRecipient,
   getClaimsBySppg,
   getImpactStats,
   getNow,
   getPickupPreview,
+  updateBatch,
+  withdrawBatch,
 } from "./batches"
 export {
   advanceClock,
   canResetDemoData,
+  clearDemoHistory,
   getClockState,
   hasFutureData,
   resetClock,
   resetDemoData,
+  seedDemoHistory,
   setClock,
 } from "./clock-control"
 export { isSimClockEnabled } from "./clock"
@@ -49,10 +55,14 @@ export { DEMO_PASSWORD } from "./seed"
 export {
   collectDisposal,
   getDisposalQueue,
+  getDisposalsBySppg,
   getDisposalsByTps,
   getDisposalSummary,
 } from "./disposals"
 export { directionsUrl, distanceKm, isValidGeoPoint } from "./geo"
+export { filterReportEvents, parseEventDay } from "./report-core"
+export { toReportCsv } from "./report-csv"
+export { getDailyTrend, getSppgReport } from "./reports"
 export {
   getRecipientById,
   getRecipients,
